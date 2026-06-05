@@ -4,30 +4,16 @@
 
 一个单文件的 **Tampermonkey / Violentmonkey 油猴脚本**，在 [www.lightnovel.fun](https://www.lightnovel.fun) 网站之上注入一个干净、类 Google Docs 的**沉浸式阅读器**——*不替换*原站。它同源调用网站自己的 Web API，把章节渲染进一个无干扰的 Shadow-DOM 浮层，记住你读到哪里，并能把整本书导出为 EPUB / TXT，或直接推送进你的 **Calibre** 书库（带真实元数据）。
 
-> 📥 **一键安装**：先装 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)，然后点 **[📖 安装脚本 / Install](https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js)** —— 浏览器会直接跳到油猴的安装页。
-> （此链接需仓库为 **public** 才能用：私有仓库的 `raw` 链接需要临时 token，无法直接安装。）
-
+> 📥 **一键安装**： **[📖 安装脚本 / Install](https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js)** 
 ## 功能
 
-- **沉浸阅读浮层**——纸白 / 护眼 / 夜间等主题，可调字号、字体、行距、页宽；原页面上的内容不会被改动。
-- **左侧大纲**（类 Google Docs）——一键跳到任意小节或章节。
-- **自动 + 手动分章**——超长的单篇文章会被自动切成小节；你也可以手动分章 / 合并。
-- **按章书签**——在大纲里按所在章节分组。
-- **Sublime 风格缩略图**——类代码编辑器的页面缩略图，**点击即跳**到光标下的内容（基于冻结的切片快照定位）。
-- **主题**——内置多种主题，外加**跟随系统**（自动浅 / 深色）和**自定义底色**（任意十六进制色）。
-- **界面语言**——**中文 / English**，默认跟随系统语言，可在设置里切换。
-- **续读**——网文回到 LightNovel *自己*历史里上次看的**章节**；单篇作品回到本地记忆里的上次**滚动位置**。进度按登录账号分开存放，可**导出 / 导入**迁移。
-- **导出**——一键 **EPUB**（含封面 + 内嵌插图）或 **TXT**，并可选择**章节范围**。EPUB **默认输出 EPUB3（现行标准）**，也可在设置里切回 **EPUB2** 兼容旧设备 / 旧阅读器。
-- **发送到 Calibre**——把你刚读的那本 EPUB POST 给可选的 [`calibre-bridge`](calibre-bridge/) 配套服务，由它放进 Calibre-Web-Automated 书库。
-- **元数据整理**——内置规则化的署名解析（作者 / 插画 / 翻译 / 图源 / 录入，简繁兼容），外加**可选的 LLM 路径**（OpenAI 兼容 / DeepSeek / Kimi）：仅读取卷首那一小段署名信息，并按书缓存。
+待补充
 
 ## 安装
 
 1. 装一个油猴管理器：**[Tampermonkey](https://www.tampermonkey.net/)** 或 **[Violentmonkey](https://violentmonkey.github.io/)**。
 2. 安装脚本：点 **[📖 安装 / Install](https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js)**（即上面 raw `.user.js` 的链接），油猴会直接弹出安装页；或把 [`lightnovel-immersive-reader.user.js`](lightnovel-immersive-reader.user.js) 内容粘进一个新脚本里。
-3. 打开 `https://www.lightnovel.fun/` 上的任意页面——阅读器即已就绪。
 
-脚本只申请 `GM_xmlhttpRequest`，并 `@connect` 到 `lightnovel.fun`、`127.0.0.1` / `localhost`（可选的本地 bridge），以及你选用的 LLM 服务（DeepSeek / Kimi / OpenAI / Moonshot）。脚本里不写死任何密钥——API key 与 bridge token 都在阅读器设置里运行时填入，仅保存在本机浏览器的 localStorage。
 
 ## 快速使用
 
@@ -38,9 +24,9 @@
   - **⚙**——阅读设置（主题、字号、字体、行距、页宽、缩略图、续读、书库、LLM）以及分步的**功能向导**
 - 点右下角的 **✕ 退出** 胶囊或按 **Esc** 离开。退出时网站会停在你正在读的那一章，让背后的页面与之对应。
 
-## 可选：发送到你的 Calibre 书库
+## 可选：发送到 Calibre 书库
 
-阅读器可以把你刚读的 EPUB POST 进一个 **Calibre-Web-Automated (CWA)** 书库，经由 [`calibre-bridge/`](calibre-bridge/) 这个 FastAPI 配套服务——它会丰富 EPUB 的 OPF 元数据（书名、作者、译者、系列 + 卷号、标识符、封面、标签）并放入 CWA 的 ingest 目录。**仅导入**——不同步进度 / 书签。
+阅读器可以把你刚读的 EPUB经由 [`calibre-bridge/`](calibre-bridge/) 这个 FastAPI 配套服务 POST 进指定的 **Calibre-Web-Automated (CWA)** 书库。
 
 ```bash
 cd calibre-bridge
@@ -48,7 +34,7 @@ cp .env.example .env          # 可选：设置 BRIDGE_TOKEN
 docker compose up -d --build
 ```
 
-这会同时拉起 CWA（Web UI 在 `http://localhost:8083`）和 bridge（`http://127.0.0.1:8788`）。然后在阅读器里打开**设置 → 发送到书库（Calibre）**，勾选*启用书库*，URL 保持 `http://127.0.0.1:8788`，并（可选）粘贴你的 token。下载对话框里就会出现 **📚 发送到书库** 按钮。远程 / Tailscale 部署、`calibredb` 模式与 API 详见 [`calibre-bridge/README.md`](calibre-bridge/README.md)。
+这会同时拉起 CWA（Web UI 在 `http://localhost:8083`）和 bridge（`http://127.0.0.1:8788`）。然后在阅读器里打开**设置 → 发送到书库（Calibre）**，勾选*启用书库*，URL 保持 `http://127.0.0.1:8788`，并（可选）粘贴你的 token。下载对话框里就会出现 **📚 发送到书库** 按钮。详见 [`calibre-bridge/README.md`](calibre-bridge/README.md)。
 
 > ⚠️ **实验性 / 风险自负**：calibre-bridge 集成、以及脚本向外部服务的 `@connect`（本地书库 + LLM：api.deepseek.com / api.kimi.com / api.openai.com / api.moonshot.cn）均为**实验性功能**。它们会连接到本机以外的外部服务，**可能产生费用**（LLM 调用），请在了解清楚后**自担风险**使用。你的 API key 与 bridge token 仅保存在本机浏览器的 localStorage 里。这两块功能在设置中默认是**折叠收起**的，并标注了「实验性」。
 
