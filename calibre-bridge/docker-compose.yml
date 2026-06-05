@@ -1,0 +1,49 @@
+name: lknovel-library
+
+services:
+  # Calibre-Web-Automated: your book library + web reader. Drop EPUBs in the ingest
+  # folder and it auto-imports them (with the metadata the bridge wrote into the OPF).
+  calibre-web-automated:
+    image: crocodilestick/calibre-web-automated:latest
+    container_name: cwa
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Tokyo
+    volumes:
+      - cwa-config:/config
+      - cwa-library:/calibre-library
+      - cwa-ingest:/cwa-book-ingest
+    ports:
+      - "8083:8083"            # CWA web UI  → http://localhost:8083
+    restart: unless-stopped
+
+  # The bridge the reader talks to. It enriches each book's metadata and drops it into
+  # CWA's ingest folder. (No progress/bookmark sync — the reader keeps its own position.)
+  bridge:
+    build: .
+    container_name: lknovel-bridge
+    environment:
+      - BRIDGE_MODE=ingest
+      - INGEST_DIR=/cwa-book-ingest
+      - STATE_DB=/data/state.sqlite3
+      # set a token here AND in the reader's settings to lock the bridge down (recommended if exposed):
+      # - BRIDGE_TOKEN=change-me
+      - CORS_ORIGINS=https://www.lightnovel.fun,https://lightnovel.fun,http://localhost:5180,http://127.0.0.1:5180
+    volumes:
+      - cwa-ingest:/cwa-book-ingest    # same volume CWA watches
+      - bridge-data:/data
+    ports:
+      # localhost only (reader runs on THIS machine). To reach the bridge from other devices
+      # (home server + Tailscale), use `- "8788:8788"` instead and point the reader's 书库地址 at
+      # http://<server-ip-or-tailscale-host>:8788 — set BRIDGE_TOKEN above when you do.
+      - "127.0.0.1:8788:8788"          # bridge API → http://127.0.0.1:8788
+    depends_on:
+      - calibre-web-automated
+    restart: unless-stopped
+
+volumes:
+  cwa-config:
+  cwa-library:
+  cwa-ingest:
+  bridge-data:

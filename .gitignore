@@ -1,0 +1,35 @@
+# ── secrets — NEVER commit (.env.example is the only env file that ships) ──
+.env
+**/.env
+.env.local
+*.key
+*.pem
+
+# ── node ──
+node_modules/
+npm-debug.log*
+
+# ── python / calibre-bridge ──
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# ── bridge local runtime / e2e artifacts ──
+calibre-bridge/_e2e/
+calibre-bridge/data/
+
+# ── test/verify scratch ──
+_shots*/
+verify/_shots*/
+
+# ── editor / OS ──
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

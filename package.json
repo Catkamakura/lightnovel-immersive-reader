@@ -1,0 +1,17 @@
+{
+  "name": "lightnovel-immersive-reader",
+  "version": "1.13.0",
+  "private": true,
+  "description": "A Tampermonkey userscript that injects a clean, Google-Docs-style immersive reader into lightnovel.fun — auto/manual chapterization, per-chapter bookmarks, a Sublime-style minimap, themes, resume-from-LK-history, and one-click EPUB/TXT export or send-to-Calibre with rule-based + optional LLM metadata.",
+  "type": "module",
+  "scripts": {
+    "verify": "node verify/verify-userscript.mjs",
+    "verify:webnovel": "node verify/verify-webnovel.mjs",
+    "verify:lib": "node verify/verify-lib.mjs",
+    "playwright:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  },
+  "license": "MIT"
+}
