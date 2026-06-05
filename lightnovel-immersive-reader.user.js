@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.15.5
+// @version      1.16.0
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
@@ -109,7 +109,6 @@
     ttl('r-top', '回到顶部');
     const h3 = $('setPanel') && $('setPanel').querySelector('h3'); if (h3 && h3.firstChild) h3.firstChild.textContent = t('阅读设置') + ' ';
     set('dl-lib', '📚 发送到书库（Calibre）'); set('dl-epub', '📖 EPUB（封面+插图）'); set('dl-txt', '📄 TXT（纯文本）'); set('dlgClose', '取消');
-    const sp = $('dlRange') && $('dlRange').querySelectorAll('.dl-range-row > span'); if (sp) { if (sp[0]) sp[0].textContent = t('从'); if (sp[1]) sp[1].textContent = t('到'); }
     set('guideSkip', '跳过'); set('guidePrev', '‹ 上一步');
     const ld = $('content') && $('content').querySelector('.loading'); if (ld) ld.textContent = t('加载中…');
   }
@@ -420,8 +419,19 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
 .scrim { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.25); display: none; } .scrim.show { display: block; }
 .loading { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ir-muted); font-size: 14px; }
 .dlg { position: absolute; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.4); } .dlg.show { display: flex; } .dlg-card { width: 320px; background: var(--ir-surface); color: var(--ir-text); border-radius: 16px; padding: 22px; box-shadow: 0 16px 50px rgba(0,0,0,.4); text-align: center; } .dlg-card .t { font-size: 17px; font-weight: 800; margin-bottom: 6px; } .dlg-card .m { font-size: 13px; opacity: .65; margin-bottom: 18px; min-height: 1.2em; } .dlg-card .acts { display: flex; flex-direction: column; gap: 10px; } .dlg-card .acts button { padding: 12px; border-radius: 11px; border: none; cursor: pointer; font-size: 14px; font-weight: 700; } .dl-range { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; text-align: left; }
-.dl-range-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; opacity: .85; }
-.dl-range-row span { flex-shrink: 0; width: 1.6em; } .dl-range select { flex: 1; min-width: 0; padding: 7px 8px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--ir-muted) 30%, transparent); background: var(--ir-surface); color: var(--ir-text); font-size: 12.5px; }
+.dl-rng-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+#dlRngCount { font-weight: 400; opacity: .55; font-size: 11px; }
+.dl-rng { position: relative; height: 26px; }
+.dl-rng input[type="range"] { position: absolute; top: 0; left: 0; width: 100%; height: 26px; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.dl-rng input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+.dl-rng input[type="range"]::-moz-range-track { height: 4px; background: transparent; }
+.dl-rng input[type="range"]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #6366f1; border: 2px solid var(--ir-surface); box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: grab; }
+.dl-rng input[type="range"]::-moz-range-thumb { pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: #6366f1; border: 2px solid var(--ir-surface); box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: grab; }
+.dl-rng-track { position: absolute; top: 11px; left: 2px; right: 2px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ir-muted) 30%, transparent); }
+.dl-rng-fill { position: absolute; top: 0; height: 100%; border-radius: 2px; background: #6366f1; }
+.dl-rng-names { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; opacity: .62; margin-top: 5px; min-height: 1.2em; }
+.dl-rng-names span { max-width: 47%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-rng-names span:last-child { text-align: right; }
 .dlg-card .acts .lib { background: linear-gradient(120deg,#6366f1,#a855f7); color: #fff; } .dlg-card .acts .epub { background: color-mix(in srgb, #6366f1 16%, transparent); color: var(--ir-text); } .dlg-card .acts .txt { background: color-mix(in srgb, var(--ir-muted) 18%, transparent); color: var(--ir-text); } .dlg-card .cancel { margin-top: 14px; border: none; background: none; color: var(--ir-muted); cursor: pointer; font-size: 13px; }
 .ch-sep { height: 0; border-top: 1px dashed color-mix(in srgb, var(--ir-muted) 32%, transparent); margin: 2.4em auto 1.8em; max-width: 60%; }
 .ch-inner { display: block; }
@@ -562,7 +572,7 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
       </div>
       <div class="scrim" id="scrim"></div>
       <div class="panel right" id="setPanel"><h3>阅读设置 <button class="icon-btn x" id="setClose">✕</button></h3><div class="pbody" id="setBody"></div></div>
-      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-range-row"><span>从</span><select id="dlFrom"></select></div><div class="dl-range-row"><span>到</span><select id="dlTo"></select></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
+      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlFromNum">1</span><span id="dlRngCount"></span><span id="dlToNum">1</span></div><div class="dl-rng"><div class="dl-rng-track"><div class="dl-rng-fill" id="dlFill"></div></div><input type="range" id="dlFrom" min="0" max="0" value="0"><input type="range" id="dlTo" min="0" max="0" value="0"></div><div class="dl-rng-names"><span id="dlFromName"></span><span id="dlToName"></span></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
       <div class="guide" id="guide"><div class="guide-spot" id="guideSpot"></div><div class="guide-card"><button class="guide-skip" id="guideSkip">跳过</button><div class="guide-step" id="guideStep"></div><div class="guide-t" id="guideTitle"></div><div class="guide-b" id="guideBody"></div><div class="guide-acts"><button id="guidePrev">‹ 上一步</button><div class="guide-dots" id="guideDots"></div><button id="guideNext" class="primary">下一步 ›</button></div></div></div>
       <div class="toast" id="toast"></div>
     </div>`;
@@ -1203,8 +1213,23 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
     $('dlRange').style.display = isSeries ? '' : 'none';
     $('dlgT').textContent = isSeries ? t('下载 / 发送（可选章节范围）') : t('下载 / 发送整本');
     if (isSeries) {
-      const opts = S.toc.map((c, i) => `<option value="${i}">${i + 1}. ${esc(((S.labels && S.labels[i]) || c.title || '').slice(0, 36))}</option>`).join('');
-      $('dlFrom').innerHTML = opts; $('dlTo').innerHTML = opts; $('dlFrom').value = '0'; $('dlTo').value = String(S.toc.length - 1);
+      // a 2-thumb range slider instead of two N-option dropdowns (cheap even for 1000+ chapters):
+      // chapter numbers update live; the chapter NAMES fill in shortly after you stop dragging.
+      const N = S.toc.length, a = $('dlFrom'), b = $('dlTo');
+      [a, b].forEach((s) => { s.min = '0'; s.max = String(N - 1); s.step = '1'; });
+      a.value = '0'; b.value = String(N - 1);
+      const nm = (i) => ((S.labels && S.labels[i]) || (S.toc[i] && S.toc[i].title) || '').slice(0, 40);
+      const denom = Math.max(1, N - 1); let nameTimer = 0;
+      const paint = () => {
+        const lo = Number(a.value), hi = Number(b.value);
+        $('dlFromNum').textContent = lo + 1; $('dlToNum').textContent = hi + 1;
+        $('dlRngCount').textContent = '· ' + (hi - lo + 1) + ' / ' + N;
+        $('dlFill').style.left = (lo / denom * 100) + '%'; $('dlFill').style.width = ((hi - lo) / denom * 100) + '%';
+        clearTimeout(nameTimer); nameTimer = setTimeout(() => { $('dlFromName').textContent = nm(lo); $('dlToName').textContent = nm(hi); }, 180);
+      };
+      a.oninput = () => { if (Number(a.value) > Number(b.value)) a.value = b.value; paint(); };   // thumbs can't cross
+      b.oninput = () => { if (Number(b.value) < Number(a.value)) b.value = a.value; paint(); };
+      paint();
     }
   }
   const getDlRange = () => (S.mode === 'series' && $('dlRange').style.display !== 'none') ? { from: Number($('dlFrom').value) || 0, to: Number($('dlTo').value) } : null;
@@ -1383,17 +1408,17 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
   /* ===================== feature guide (re-openable from 设置) ======================= */
   // hl = selector to spotlight. open=needs the outline open · reveal=hover-cluster button (show it) · panel=lives inside the settings panel.
   const GUIDE = [
-    { t: { zh: '左侧大纲（▤）', en: 'Outline (▤)' }, b: { zh: '点左上角的 ▤ 打开 / 收起左侧大纲。它直接画在页面上、不会挤动正文：顶部是书名，下面是目录、书签、分卷，当前章节会高亮。', en: 'Click ▤ (top-left) to toggle the outline. It is drawn on the page and never pushes the text: the title on top, then Contents / Bookmarks / Volumes tabs and the chapter list, with the current chapter highlighted.' }, hl: '#t-outline' },
-    { t: { zh: '下载整本（⤓）', en: 'Download (⤓)' }, b: { zh: '把鼠标移到左上角的菜单上，右侧会浮出 ⤓ 下载 与 ⚙ 设置 —— ⤓ 可导出 EPUB（默认 EPUB3，含封面 / 插图）或 TXT，并能选择章节范围。只有够长的书才会出现下载。', en: 'Hover the top-left menu and ⤓ Download + ⚙ Settings slide out. ⤓ exports EPUB (EPUB3 by default, with cover/images) or TXT, with a selectable chapter range. It only shows for books long enough to be worth exporting.' }, hl: '#t-dlCorner', reveal: true },
-    { t: { zh: '目录 · 手动分章', en: 'Contents · manual split' }, b: { zh: '在「目录」标签上再点一次（它会变橙色「✂️ 调整分章」）即进入分章模式：点正文段落＝在此分章，正文里的「✕ 取消分章」＝合并。完成 / 重置就在标签栏。', en: 'Click the “Contents” tab again (it turns orange “✂️ Adjust splits”) to enter split mode: click a paragraph to split there; “✕ undo split” in the text merges. Finish / Reset are in the tab bar.' }, hl: '.tab-toc', open: true },
-    { t: { zh: '书签', en: 'Bookmarks' }, b: { zh: '切到「书签」标签就进入书签模式：点正文任意段落＝添加 / 移除。书签按所在章节分组；删除时先把鼠标移到书签上、点 ✕ 变红后再点一次确认。', en: 'Switch to the “Bookmarks” tab to enter bookmark mode: click any paragraph to add / remove. Bookmarks are grouped by chapter; to delete, hover a bookmark, click ✕ until it turns red, then click again to confirm.' }, hl: '[data-t="bm"]', open: true },
-    { t: { zh: '分卷', en: 'Volumes' }, b: { zh: '多卷作品可在「分卷」标签之间切换；切到别卷后退出沉浸阅读，网站会停在你正在读的那一卷。', en: 'Multi-volume works switch between “Volumes”; after switching, leaving the reader returns the site to the volume you were reading.' }, hl: '[data-t="vol"]', open: true },
-    { t: { zh: '阅读定位 · 缩略图', en: 'Navigation · minimap' }, b: { zh: '右侧浮条：上一章 / 下一章 / 回顶部（再点返回原处）；键盘 ← → 也能翻章。在设置里打开「缩略图 Minimap」后，点缩略图上的任意位置（包括插图）就能直接跳到那一段。', en: 'Right rail: Prev / Next / Back-to-top (tap again to return). ← → also flip chapters. Turn on the Minimap in Settings, then click anywhere on it (including an illustration) to jump straight there.' }, hl: '#rail' },
-    { t: { zh: '设置在这里（⚙）', en: 'Settings (⚙)' }, b: { zh: '把鼠标移到左上角菜单 ▤ 上，滑出的 ⚙ 就是设置。下面逐项带你看一遍设置里的功能。', en: 'Hover the ▤ menu (top-left); the ⚙ that slides out is Settings. We’ll walk through it below.' }, hl: '#t-set', reveal: true },
-    { t: { zh: '主题 / 外观', en: 'Theme / appearance' }, b: { zh: '主题可选「跟随系统 / 纸白 / 护眼 / 夜间 / 自定义底色」，还能调字号、行距、页宽、字体；顶部可切换界面语言。', en: 'Theme: System / Paper / Sepia / Night / custom colour, plus font size, line height, page width and font. The language switch is at the very top.' }, hl: '#sw', panel: true },
-    { t: { zh: '阅读进度', en: 'Reading progress' }, b: { zh: '默认开启「阅读进度」：网文回到上次看的章节、单篇回到上次的位置（按登录账号分开存放）。换设备时用「导出 / 导入进度」迁移即可。', en: '“Reading progress” (on by default): web novels return to your last chapter, single articles to the last position (stored per signed-in account). Use Export / Import to move it between devices.' }, hl: '#s-resume', panel: true },
-    { t: { zh: '高级（实验性）', en: 'Advanced (experimental)' }, b: { zh: '「高级（实验性）」默认折叠收起 —— 里面有 EPUB 版本（3 / 2）、发送到书库（Calibre）、LLM 整理元数据。它们会连接外部服务、可能产生费用，请自行了解、自担风险后再展开开启。', en: 'The folded “Advanced (experimental)” section holds the EPUB version (3/2), Send-to-Calibre, and LLM metadata tidy-up. They connect to external services and may cost money — read up first and use them at your own risk.' }, hl: '.set-fold', panel: true },
-    { t: { zh: '退出', en: 'Exit' }, b: { zh: '读完点右下角「✕ 退出」离开沉浸阅读；若中途翻到了别的章节，网站会停在你正在读的那一章。', en: 'When done, click “✕ Exit” (bottom-right). If you flipped to another chapter, the site lands on the one you were reading.' }, hl: '#close' },
+    { t: { zh: '左侧大纲（☰）', en: 'The outline (☰)' }, b: { zh: '左上角那个 ☰ 是目录开关，点一下就能展开或收起左边的大纲。它浮在页面上、不会把正文挤走——最上面是书名，下面有「目录 / 书签 / 分卷」几个标签和章节列表，你正在看的那一章会亮起来。', en: 'That ☰ in the top-left toggles the outline on the left. It floats over the page and never shoves your text around — the title sits up top, then the Contents / Bookmarks / Volumes tabs and the chapter list, with the chapter you’re on lit up.' }, hl: '#t-outline' },
+    { t: { zh: '下载整本（⤓）', en: 'Download (⤓)' }, b: { zh: '把鼠标挪到左上角菜单上，旁边会滑出 ⤓ 下载 和 ⚙ 设置。点 ⤓ 就能把整本存成 EPUB（默认 EPUB3，带封面和插图）或 TXT，还能挑要哪几章。太短的内容不会出现这个按钮。', en: 'Hover the menu in the top-left and ⤓ Download and ⚙ Settings slide out beside it. ⤓ saves the whole book as EPUB (EPUB3 by default, cover and pictures included) or TXT, and lets you pick a chapter range. Short posts won’t show it.' }, hl: '#t-dlCorner', reveal: true },
+    { t: { zh: '目录 · 手动分章', en: 'Contents · split by hand' }, b: { zh: '在「目录」标签上再点一下，它会变成橙色的「✂️ 调整分章」。这时点正文里任意一段，就在那儿开一个新章；正文里冒出来的「✕ 取消分章」则是把两章合回去。改好后在标签栏点完成或重置就行。', en: 'Click the “Contents” tab a second time and it turns into an orange “✂️ Adjust splits.” Now click any paragraph to start a new chapter there; the “✕ undo split” marks in the text merge two back together. When you’re happy, hit Finish or Reset in the tab bar.' }, hl: '.tab-toc', open: true },
+    { t: { zh: '书签', en: 'Bookmarks' }, b: { zh: '切到「书签」标签就能加书签——点正文任意一段即可加上或取消。书签会按所在章节归类；想删的话，先把鼠标移到书签上、点 ✕ 让它变红，再点一次确认。', en: 'Switch to the “Bookmarks” tab to drop bookmarks — click any paragraph to add or remove one. They’re grouped by chapter; to delete, hover a bookmark, click ✕ until it turns red, then click again to confirm.' }, hl: '[data-t="bm"]', open: true },
+    { t: { zh: '分卷', en: 'Volumes' }, b: { zh: '多卷的作品可以在「分卷」标签里换卷看。换到别的卷再退出沉浸阅读，网站也会跟着停在你正在读的那一卷。', en: 'For multi-volume works, the “Volumes” tab jumps between volumes. Switch volumes and leave the reader, and the site follows you to whichever one you were on.' }, hl: '[data-t="vol"]', open: true },
+    { t: { zh: '翻页 · 缩略图', en: 'Navigating · the minimap' }, b: { zh: '右边那条浮窗有上一章 / 下一章 / 回顶部（再点一下回到原处），键盘 ← → 也能翻章。在设置里打开「缩略图 Minimap」后，点缩略图上的任意位置（插图也算）就能直接跳过去。', en: 'The little rail on the right has Prev / Next / Back-to-top (tap it again to come back), and ← → flip chapters too. Turn on the Minimap in settings, then click anywhere on it — illustrations included — to jump straight there.' }, hl: '#rail' },
+    { t: { zh: '设置入口（⚙）', en: 'Settings (⚙)' }, b: { zh: '刚才滑出来的 ⚙ 就是设置入口，在左上角 ☰ 菜单旁边。下面我们一项项过一遍里面的东西。', en: 'That ⚙ sliding out next to the ☰ menu (top-left) opens Settings. Let’s walk through what’s inside, one thing at a time.' }, hl: '#t-set', reveal: true },
+    { t: { zh: '主题 / 外观', en: 'Theme & look' }, b: { zh: '主题可以选跟随系统、纸白、护眼、夜间，或自己填个底色；字号、行距、页宽、字体也都能调。最上面还能切换界面语言。', en: 'Pick a theme — System, Paper, Sepia, Night, or your own background colour — and tweak the font, size, line spacing and page width. The language switch is right at the top.' }, hl: '#sw', panel: true },
+    { t: { zh: '阅读进度', en: 'Reading progress' }, b: { zh: '「阅读进度」默认开着：网文会帮你回到上次看的那一章，单篇会回到上次的位置（按登录账号分开记）。换设备时，用「导出 / 导入进度」搬过去就好。', en: '“Reading progress” is on by default: web novels take you back to your last chapter, single articles to your last spot (kept separately per account). Switching devices? Export / Import carries it over.' }, hl: '#s-resume', panel: true },
+    { t: { zh: '高级（实验性）', en: 'Advanced (experimental)' }, b: { zh: '「高级（实验性）」平时是收起来的，里面有 EPUB 版本（3 / 2）、发送到书库（Calibre）、还有用 LLM 整理元数据。这几样都会连到外部服务、可能花钱，建议先弄清楚、自担风险再用。', en: 'The folded “Advanced (experimental)” section holds the EPUB version (3/2), Send-to-Calibre, and LLM metadata tidy-up. These reach out to external services and can cost money — have a look first and use them at your own risk.' }, hl: '.set-fold', panel: true },
+    { t: { zh: '退出', en: 'Done reading' }, b: { zh: '看完了，点右下角的「✕ 退出」就能离开沉浸阅读。要是中途翻到了别的章节，网站会停在你正在读的那一章。', en: 'All done? The “✕ Exit” button in the bottom-right leaves the reader. If you flipped to another chapter along the way, the site lands on the one you were reading.' }, hl: '#close' },
   ];
   let guideIdx = 0;
   const clearGuideHl = () => root.querySelectorAll('.guide-hl').forEach((el) => el.classList.remove('guide-hl'));

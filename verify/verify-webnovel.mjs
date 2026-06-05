@@ -73,13 +73,15 @@ check('minimap works in series (current chapter only)', mm.on && mm.cw > 0, 'cw=
 // download range selector
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-dlCorner').click());
 await sleep(p, 300);
+await sleep(p, 300);   // let the debounced name labels fill in
 const rng = await ev(p, () => {
   const r = document.getElementById('lkir-host').shadowRoot;
   const from = r.getElementById('dlFrom'), to = r.getElementById('dlTo');
-  return { shown: getComputedStyle(r.getElementById('dlRange')).display !== 'none', n: from.options.length, toVal: to.value, fromName: (from.options[0] && from.options[0].textContent || '').slice(0, 20), lastName: (to.options[to.options.length - 1] && to.options[to.options.length - 1].textContent || '').slice(0, 20) };
+  const N = Number(to.max) + 1;
+  return { shown: getComputedStyle(r.getElementById('dlRange')).display !== 'none', type: from.type, N, fromVal: from.value, toVal: to.value, fromNum: r.getElementById('dlFromNum').textContent, toNum: r.getElementById('dlToNum').textContent, fromName: r.getElementById('dlFromName').textContent, toName: r.getElementById('dlToName').textContent };
 });
 console.log('  rng:', JSON.stringify(rng));
-check('download shows named chapter-range selector (default = ALL)', rng.shown && rng.n > 1 && rng.toVal === String(rng.n - 1) && rng.fromName.length > 2);
+check('download shows a 2-thumb chapter-range slider (default = ALL, named ends)', rng.shown && rng.type === 'range' && rng.N > 1 && rng.fromVal === '0' && rng.toVal === String(rng.N - 1) && rng.fromNum === '1' && rng.toNum === String(rng.N) && rng.fromName.length > 1 && rng.toName.length > 1);
 
 console.log('\nerrors:', errors.length); errors.slice(0, 5).forEach((e) => console.log('  ' + e));
 const passed = results.filter((r) => r.ok).length;
