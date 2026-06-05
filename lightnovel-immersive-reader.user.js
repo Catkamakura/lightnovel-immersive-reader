@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.15.4
+// @version      1.15.5
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
@@ -807,8 +807,14 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
     } else if (S.outlineTab === 'bm') {
       renderBookmarks(list);
     } else if (S.mode === 'series') {
-      list.innerHTML = S.toc.map((c, i) => `<button class="cat-item ${i === S.idx ? 'active' : ''}" data-i="${i}" title="${esc(c.title)}"><span class="n">${i + 1}</span><span>${esc(S.labels[i] || c.title)}</span></button>`).join('');
-      list.querySelectorAll('.cat-item').forEach((b) => (b.onclick = () => { if (isMobile()) openOutline(false); renderChapter(Number(b.dataset.i)); }));
+      // A web novel can have 1000+ chapters — build the chapter buttons ONCE. On a page turn the list is
+      // identical, so skip the rebuild (updateCurrent moves the highlight, and the outline keeps its scroll).
+      const sig = S.toc.length + ':' + (S.toc[0] ? S.toc[0].aid : 0);
+      if (list.dataset.sig !== sig || !list.querySelector('.cat-item[data-i]')) {
+        list.dataset.sig = sig;
+        list.innerHTML = S.toc.map((c, i) => `<button class="cat-item ${i === S.idx ? 'active' : ''}" data-i="${i}" title="${esc(c.title)}"><span class="n">${i + 1}</span><span>${esc(S.labels[i] || c.title)}</span></button>`).join('');
+        list.querySelectorAll('.cat-item').forEach((b) => (b.onclick = () => { if (isMobile()) openOutline(false); renderChapter(Number(b.dataset.i)); }));
+      }
     } else if (S.cat.length <= 1) {
       list.innerHTML = '<div class="cat-note">本篇为单段内容。再点一次上方「目录」即可进入分章调整、自行划分。</div>';
     } else {
@@ -860,7 +866,15 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
   }
   function updateCurrent() {
     const list = $('outlineList');
-    if (S.mode === 'series') { $('curChip').textContent = (S.labels && S.labels[S.idx]) || S.bookTitle || ''; if (list) list.querySelectorAll('.cat-item').forEach((it) => it.classList.toggle('active', it.dataset.i === String(S.idx))); return; }
+    if (S.mode === 'series') {
+      $('curChip').textContent = (S.labels && S.labels[S.idx]) || S.bookTitle || '';
+      if (list) {
+        let act = null;
+        list.querySelectorAll('.cat-item').forEach((it) => { const on = it.dataset.i === String(S.idx); it.classList.toggle('active', on); if (on) act = it; });
+        if (act) { const lr = list.getBoundingClientRect(), ar = act.getBoundingClientRect(); if (ar.height && (ar.top < lr.top || ar.bottom > lr.bottom)) list.scrollTop += (ar.top - lr.top) - list.clientHeight / 2 + ar.height / 2; }   // keep the current chapter in view on prev/next
+      }
+      return;
+    }
     const cur = streamCur(); const sec = S.sections[cur];
     $('curChip').textContent = sec ? (S.secLabels[cur] || sec.title) : '';
     if (list && S.outlineTab === 'toc') { let any = false; list.querySelectorAll('.cat-item').forEach((it) => { const on = it.dataset.sec === String(cur); it.classList.toggle('active', on); any = any || on; }); }
