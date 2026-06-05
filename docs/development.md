@@ -114,7 +114,7 @@ docker run --rm -v "$PWD":/data eclipse-temurin:17-jre \
 - **Progress is account-scoped — never share across uids.** Reading state is keyed by the `uid` parsed from the site's `security_key` (`<hex>:<uid>:<exp>`) and is export/importable **per account**. Never write one account's progress under another `uid`, and keep import/export uid-isolated.
 - **Never hardcode credentials.** The repo is private but contains **no secrets**. LLM API keys and the bridge token are entered at runtime (reader settings → `localStorage`; bridge → env). Do not add keys to source, docs, or tests.
 - **`@connect` must list every host.** Because `GM_xmlhttpRequest` bypasses CORS, any new external endpoint requires a matching `@connect` line in the metadata block — otherwise Tampermonkey blocks the request even though the harness shim would let it through.
-- **Bump `@version` on every userscript change.** The `// @version` line (currently `1.14.0`) drives Tampermonkey's update mechanism. Note `package.json` carries its own independent `version` (currently `1.13.0`); the authoritative reader version is the `@version` header, so always bump it when you touch the userscript.
+- **Bump `@version` on every userscript change.** The `// @version` line (currently `1.17.0`) drives Tampermonkey's update mechanism. `package.json` carries its own `version` field (kept in step at `1.17.0`); the authoritative reader version is the `@version` header, so always bump it when you touch the userscript.
 
 ### Relevant files
 
