@@ -73,15 +73,33 @@ check('minimap works in series (current chapter only)', mm.on && mm.cw > 0, 'cw=
 // download range selector
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-dlCorner').click());
 await sleep(p, 300);
-await sleep(p, 300);   // let the debounced name labels fill in
 const rng = await ev(p, () => {
   const r = document.getElementById('lkir-host').shadowRoot;
   const from = r.getElementById('dlFrom'), to = r.getElementById('dlTo');
-  const N = Number(to.max) + 1;
-  return { shown: getComputedStyle(r.getElementById('dlRange')).display !== 'none', type: from.type, N, fromVal: from.value, toVal: to.value, fromNum: r.getElementById('dlFromNum').textContent, toNum: r.getElementById('dlToNum').textContent, fromName: r.getElementById('dlFromName').textContent, toName: r.getElementById('dlToName').textContent };
+  const N = Number(to.max);
+  // exercise validation: push 'from' way past the max, commit -> must clamp to N
+  from.value = '99999'; from.dispatchEvent(new Event('input', { bubbles: true })); from.dispatchEvent(new Event('change', { bubbles: true }));
+  const clampedFrom = from.value;
+  from.value = '1'; from.dispatchEvent(new Event('change', { bubbles: true }));   // restore default-all
+  return { shown: getComputedStyle(r.getElementById('dlRange')).display !== 'none', type: from.type, N, fromVal: from.value, toVal: to.value, clampedFrom, fromName: r.getElementById('dlFromName').textContent, toName: r.getElementById('dlToName').textContent };
 });
 console.log('  rng:', JSON.stringify(rng));
-check('download shows a 2-thumb chapter-range slider (default = ALL, named ends)', rng.shown && rng.type === 'range' && rng.N > 1 && rng.fromVal === '0' && rng.toVal === String(rng.N - 1) && rng.fromNum === '1' && rng.toNum === String(rng.N) && rng.fromName.length > 1 && rng.toName.length > 1);
+check('download shows a numeric chapter range (default = ALL, named ends, clamps invalid input)', rng.shown && rng.type === 'number' && rng.N > 1 && rng.fromVal === '1' && rng.toVal === String(rng.N) && rng.clampedFrom === String(rng.N) && rng.fromName.length > 1 && rng.toName.length > 1);
+
+// guide: the Skip button must respond to a REAL mouse click (a programmatic .click()
+// bypasses hit-testing and hid a bug where .guide-step's opacity stacking context ate the click).
+await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; r.getElementById('dlgClose').click(); r.getElementById('t-set').click(); });
+await sleep(p, 250);
+await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('s-guide').click());
+await sleep(p, 450);
+const gOpen = await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('guide').classList.contains('show'));
+const sb = await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot.getElementById('guideSkip').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+const hitId = await ev(p, (b) => { const t = document.getElementById('lkir-host').shadowRoot.elementFromPoint(b.x, b.y); return t && (t.id || t.className); }, sb);
+await p.mouse.click(sb.x, sb.y);
+await sleep(p, 350);
+const gClosed = await ev(p, () => !document.getElementById('lkir-host').shadowRoot.getElementById('guide').classList.contains('show'));
+console.log('  guide skip: opened=' + gOpen + ' hitAtSkip=' + hitId + ' closedByRealClick=' + gClosed);
+check('guide Skip closes the guide on a real mouse click (not eaten by .guide-step)', gOpen && hitId === 'guideSkip' && gClosed);
 
 console.log('\nerrors:', errors.length); errors.slice(0, 5).forEach((e) => console.log('  ' + e));
 const passed = results.filter((r) => r.ok).length;

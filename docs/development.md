@@ -49,7 +49,7 @@ All three are Playwright scripts that read the userscript from disk, inject a **
 | Harness | npm script | What it checks | Requirements |
 | --- | --- | --- | --- |
 | `verify/verify-userscript.mjs` | `npm run verify` | **32 checks** across groups A (layout/interactions on a stream multi-volume book: outline, split, grouped bookmarks + delete-confirm, theme swatches, settings toggle), D (no-edit-hover, minimap build + drag, guide spotlight/steps/auto-open), B (分卷 switch + URL sync on exit), C (big single article) | `npx playwright install chromium` |
-| `verify/verify-webnovel.mjs` | `npm run verify:webnovel` | **6 checks** on a web-novel series: paged `.blk` rendering, per-chapter bookmarks (a different chapter shows only its own), minimap in series, named chapter-range download selector (default = ALL) | same |
+| `verify/verify-webnovel.mjs` | `npm run verify:webnovel` | **7 checks** on a web-novel series: paged `.blk` rendering, per-chapter bookmarks (a different chapter shows only its own), minimap in series, numeric chapter-range download (two number inputs, default = ALL, named ends, clamps invalid input), and the guide **Skip** button responding to a *real mouse click* (regression guard for the `.guide-step` opacity stacking context) | same |
 | `verify/verify-lib.mjs` | `npm run verify:lib` | End-to-end reader ↔ bridge: health (`mode=ingest`), 发送到书库 button, EPUB import with parsed metadata (title/translator/series/volume), success dialog, EPUB lands in the CWA ingest folder, book queryable via `/api/lookup` | **bridge running on `:8788`** + chromium |
 
 ### Running them

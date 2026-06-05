@@ -20,7 +20,7 @@ A single-file **Tampermonkey / Violentmonkey userscript** that injects a clean, 
 - **Export** — one-click **EPUB** (with cover + embedded images) or **TXT**, with a selectable **chapter range**. **EPUB3 by default** (current standard) with an **EPUB2 fallback** for older devices/readers — see below.
 - **Send to Calibre** — POST the exact EPUB you read to the optional [`calibre-bridge`](calibre-bridge/) companion, which drops it into a Calibre-Web-Automated library. *(experimental — see below.)*
 - **Metadata** — a rule-based credit parser (作者 / 插画 / 翻译 / 图源 / 录入, simplified + traditional) plus an **optional LLM path** (OpenAI-compatible / DeepSeek / Kimi) that reads only the short 卷首 credit block and is cached per book. *(experimental — see below.)*
-- **Step-by-step feature guide (功能向导)** — 12 steps that walk through both the reader and the settings (theme, EPUB version, resume, the experimental folds). The spotlight is positioned after the panel/scroll settles so it matches the element's real position, and the reader is non-interactive during the guide so you can't mis-click.
+- **Step-by-step feature guide (功能向导)** — 11 steps that walk through both the reader and the settings (theme, EPUB version, resume, the experimental folds). The spotlight is positioned after the panel/scroll settles so it matches the element's real position, and the reader is non-interactive during the guide so you can't mis-click.
 
 ## EPUB output
 

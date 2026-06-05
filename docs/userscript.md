@@ -353,7 +353,7 @@ The site is a SPA, so route changes are intercepted:
 | `openArticle` | 799–846 | Master loader: decides stream vs series, resumes |
 | `openReader` / `closeReader` | 1170 / 1171–1183 | Overlay lifecycle |
 | `onRoute` / `injectCardButtons` / `currentAid` | 1415–1423 / 1394–1409 / 1393 | SPA route awareness |
-| `openGuide` / `showGuideStep` / `placeSpot` | 1307 / 1320–1341 / 1313–1319 | Feature guide (12 steps) |
+| `openGuide` / `showGuideStep` / `placeSpot` | 1307 / 1320–1341 / 1313–1319 | Feature guide (11 steps) |
 
 ### `openArticle(aid)` — the decision flow (lines 799–846)
 
