@@ -1,10 +1,12 @@
 [English](README.en.md) · 简体中文
 
-# 轻读 · LightNovel Immersive Reader
+# 轻读LK美化 · LightNovel Immersive Reader
 
 一个单文件的 **Tampermonkey / Violentmonkey 油猴脚本**，在 [www.lightnovel.fun](https://www.lightnovel.fun) 网站之上注入一个干净、类 Google Docs 的**沉浸式阅读器**——*不替换*原站。它同源调用网站自己的 Web API，把章节渲染进一个无干扰的 Shadow-DOM 浮层，记住你读到哪里，并能把整本书导出为 EPUB / TXT，或直接推送进你的 **Calibre** 书库（带真实元数据）。
 
-> 📥 **一键安装**： **[📖 安装脚本 / Install](https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js)** 
+> 📥 **一键安装**： **[📖 安装脚本 / Install](https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js)**
+
+> ⚠️ 目前仅适配PC端
 ## 功能
 
 待补充
