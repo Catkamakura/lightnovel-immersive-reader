@@ -1,13 +1,17 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.20.0
+// @version      1.20.1
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @author       masiro
 // @match        https://www.lightnovel.fun/*
 // @icon         https://www.lightnovel.fun/favicon.ico
+// @homepageURL  https://github.com/Catkamakura/lightnovel-immersive-reader
+// @supportURL   https://github.com/Catkamakura/lightnovel-immersive-reader/issues
+// @updateURL    https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js
+// @downloadURL  https://raw.githubusercontent.com/Catkamakura/lightnovel-immersive-reader/main/lightnovel-immersive-reader.user.js
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
 // @connect      lightnovel.fun
