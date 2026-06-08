@@ -40,7 +40,8 @@ const $ = (id) => root.getElementById(id);
 | `close` | `.exit-btn` | "✕ 退出" |
 | `rail` / `r-prev` / `r-next` / `r-top` | right floating rail | Prev/next chapter, back-to-top |
 | `setPanel` / `setBody` / `setClose` | right slide-in | Settings panel |
-| `dlg` / `dlgT` / `dlgMsg` / `dlRange` / `dlList` / `dlRngAll` / `dlRngTip` / `dlRngCount` / `dlgActs` / `dl-lib` / `dl-epub` / `dl-txt` / `dlgClose` | download dialog | Export / send-to-library modal (the list-based chapter range picker lives in `#dlRange`; `dlFrom`/`dlTo`/`dlPhase` are module-level **variables**, not DOM ids) |
+| `dlg` / `dlgT` / `dlgMsg` / `dlRange` / `dlList` / `dlFrom` / `dlTo` / `dlRngAll` / `dlRngTip` / `dlRngCount` / `dlgActs` / `dl-lib` / `dl-epub` / `dl-txt` / `dlgClose` | download dialog | Export / send-to-library modal. The series range picker (`#dlRange`) offers **both** a click list (`#dlList`: pick a start then an end chapter) **and** `从`/`到` number inputs (`#dlFrom`/`#dlTo`), kept in two-way sync. Selection state lives in module vars `dlFrom`/`dlTo`/`dlPhase` (0-based), distinct from the same-named input ids. |
+| `qpop` | `.qpop` | The `?` help popover, anchored to the clicked `.qmark` button |
 | `guide` / `guideSpot` / `guideStep` / `guideTitle` / `guideBody` / `guidePrev` / `guideNext` / `guideDots` / `guideSkip` | feature guide | Re-openable step-by-step tour |
 | `scrim` | `.scrim` | Dim backdrop behind panel / mobile outline |
 | `toast` | `.toast` | Transient toast (`flashToast`) |
@@ -266,7 +267,7 @@ Wired into the scroll handler (`scheduleSaveProg`, line 1382) and `closeReader` 
 
 The panel is organized so the everyday controls sit at the top, a **下载 EPUB 版本** segmented control sits below the resume controls, and the two integrations with external services are **collapsed by default** behind an accessible disclosure: a `#s-adv-toggle` button (`aria-expanded`, `aria-controls="s-adv-body"`) toggles the `#s-adv-body` region (`role="region"`, `hidden` when collapsed); its open/closed state persists via `settings.foldAdv`. Inside that region the Calibre and LLM integrations are each a `<section class="set-sub">` tagged 实验性 (`.set-tag`).
 
-Inline help is **click-to-toggle**, not a native `title=` tooltip: a small `.qmark` button (`data-q="…"`) next to a control toggles an inline `.qhint` note rendered just under its row. `bindQmarks(scope)` wires these after each `renderSettings()`.
+Inline help is **click-to-show**, not a native `title=` tooltip: a small `.qmark` button (`data-q="…"`) next to a control opens a floating popover (`#qpop`) anchored to the button (flips above / clamps to the viewport edge). It closes on an outside click, Esc, a settings-list scroll, a settings re-render, or panel close. `bindQmarks(scope)` wires the buttons after each `renderSettings()`.
 
 | Control id | `settings` key | Notes |
 |---|---|---|

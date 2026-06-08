@@ -78,25 +78,35 @@ const rng = await ev(p, () => {
   const shown = getComputedStyle(r.getElementById('dlRange')).display !== 'none';
   const items = [...r.getElementById('dlList').querySelectorAll('.dl-ch')];
   const N = items.length;
+  const from = r.getElementById('dlFrom'), to = r.getElementById('dlTo');
   const endsAt = () => items.filter((b) => b.classList.contains('end1')).map((b) => Number(b.dataset.i));
   const insideAt = () => items.filter((b) => b.classList.contains('in')).map((b) => Number(b.dataset.i));
-  const endsDefault = endsAt();                                  // default = whole book → endpoints are first & last
+  const setRange = (f, t2) => { from.value = String(f); to.value = String(t2); to.dispatchEvent(new Event('change', { bubbles: true })); };   // commit via change (authoritative, focus-independent)
+  const inputType = from.type, defFrom = from.value, defTo = to.value, endsDefault = endsAt();   // default = whole book
   const labelled = items[0].querySelector('.ttl').textContent.trim().length > 0;
-  items[1] && items[1].click();                                  // pick start = chapter 2
+  items[1] && items[1].click();                                  // list: pick start = chapter 2
   const tipMid = r.getElementById('dlRngTip').textContent.trim();
-  items[3] && items[3].click();                                  // pick end = chapter 4
+  items[3] && items[3].click();                                  // list: pick end = chapter 4
   const ends = endsAt(), inside = insideAt(), countSel = r.getElementById('dlRngCount').textContent.trim();
+  const inFrom = from.value, inTo = to.value;                    // list click -> inputs synced (2 / 4)
+  setRange(5, 9);                                                // inputs -> list (range 5..9 => idx 4..8)
+  const endsTyped = endsAt(), countTyped = r.getElementById('dlRngCount').textContent.trim();
+  r.getElementById('dlRngAll').click(); setRange(99999, 99999);  // overshoot clamps to N
+  const clampFrom = from.value, endsClamp = endsAt();
   r.getElementById('dlRngAll').click();                          // 整本 resets to whole book
-  return { shown, N, labelled, endsDefault, tipMid, ends, inside, countSel, endsAll: endsAt() };
+  return { shown, N, labelled, inputType, defFrom, defTo, endsDefault, tipMid, ends, inside, countSel, inFrom, inTo, endsTyped, countTyped, clampFrom, endsClamp, endsAll: endsAt(), allFrom: from.value, allTo: to.value };
 });
 console.log('  rng:', JSON.stringify(rng));
-check('download range = list picker (default ALL; click start+end selects span; 整本 resets)',
-  rng.shown && rng.N > 3 && rng.labelled
+check('download range = list + synced number inputs (default ALL; list<->inputs; clamp; 整本 resets)',
+  rng.shown && rng.N > 9 && rng.labelled
+  && rng.inputType === 'number' && rng.defFrom === '1' && rng.defTo === String(rng.N)
   && JSON.stringify(rng.endsDefault) === JSON.stringify([0, rng.N - 1])
   && rng.tipMid.length > 0
-  && JSON.stringify(rng.ends) === JSON.stringify([1, 3]) && JSON.stringify(rng.inside) === JSON.stringify([2])
-  && rng.countSel.indexOf('3 /') === 0
-  && JSON.stringify(rng.endsAll) === JSON.stringify([0, rng.N - 1]), JSON.stringify(rng));
+  && JSON.stringify(rng.ends) === JSON.stringify([1, 3]) && JSON.stringify(rng.inside) === JSON.stringify([2]) && rng.countSel.indexOf('3 /') === 0
+  && rng.inFrom === '2' && rng.inTo === '4'
+  && JSON.stringify(rng.endsTyped) === JSON.stringify([4, 8]) && rng.countTyped.indexOf('5 /') === 0
+  && rng.clampFrom === String(rng.N) && JSON.stringify(rng.endsClamp) === JSON.stringify([rng.N - 1])
+  && JSON.stringify(rng.endsAll) === JSON.stringify([0, rng.N - 1]) && rng.allFrom === '1' && rng.allTo === String(rng.N), JSON.stringify(rng));
 
 // guide: the Skip button must respond to a REAL mouse click (a programmatic .click()
 // bypasses hit-testing and hid a bug where .guide-step's opacity stacking context ate the click).

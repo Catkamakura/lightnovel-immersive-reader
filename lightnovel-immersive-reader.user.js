@@ -426,6 +426,11 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
 .dl-rng-all { border: 1px solid color-mix(in srgb, var(--ir-muted) 30%, transparent); background: none; color: var(--ir-text); border-radius: 7px; padding: 3px 9px; cursor: pointer; font-size: 11px; opacity: .82; }
 .dl-rng-all:hover { opacity: 1; border-color: #6366f1; color: #6366f1; }
 .dl-rng-tip { font-size: 11px; opacity: .6; margin-bottom: 8px; line-height: 1.4; min-height: 1.3em; }
+.dl-nums { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.dl-nums label { display: flex; align-items: center; gap: 5px; font-size: 12px; opacity: .8; }
+.dl-nums input[type=number] { width: 72px; padding: 6px 8px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--ir-muted) 32%, transparent); background: color-mix(in srgb, var(--ir-muted) 8%, transparent); color: var(--ir-text); font-size: 13px; font-weight: 700; text-align: center; }
+.dl-nums input[type=number]:focus { outline: none; border-color: #6366f1; }
+.dl-num-sep { opacity: .5; font-weight: 700; }
 /* the chapter range picker: click a start chapter, then an end chapter (hotel/flight style) */
 .dlg-card.has-range { width: 380px; max-width: 92vw; }
 .dl-list { max-height: 44vh; overflow-y: auto; margin: 0 0 14px; border: 1px solid color-mix(in srgb, var(--ir-muted) 22%, transparent); border-radius: 10px; padding: 4px; }
@@ -474,7 +479,9 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
 .qmark { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: none; border-radius: 50%; font-size: 10px; font-weight: 700; line-height: 1; background: color-mix(in srgb, var(--ir-muted) 26%, transparent); color: var(--ir-text); cursor: pointer; opacity: .65; vertical-align: middle; flex-shrink: 0; font-family: inherit; }
 .qmark:hover { opacity: 1; }
 .qmark.on { opacity: 1; background: color-mix(in srgb, #6366f1 80%, transparent); color: #fff; }
-.qhint { font-size: 11.5px; opacity: .72; line-height: 1.55; margin: -10px 2px 12px; padding: 9px 11px; background: color-mix(in srgb, var(--ir-muted) 12%, transparent); border-radius: 8px; }
+/* ? help: a floating popover anchored to the button (not an inline accordion) */
+.qpop { position: absolute; z-index: 30; max-width: 250px; background: var(--ir-surface); color: var(--ir-text); border: 1px solid color-mix(in srgb, var(--ir-muted) 24%, transparent); border-radius: 10px; padding: 9px 11px; font-size: 11.5px; line-height: 1.55; box-shadow: 0 10px 30px rgba(0,0,0,.3); opacity: .96; display: none; }
+.qpop.show { display: block; }
 /* toggle rows are real <label>s so clicking the text flips the checkbox */
 .toggle { cursor: pointer; gap: 6px; }
 .toggle .lbl { margin: 0; }
@@ -484,7 +491,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .outline { position: absolute; left: 0; top: 0; bottom: 0; width: 312px; max-width: 86vw; z-index: 12; background: var(--ir-bg); display: flex; flex-direction: column; padding-top: 60px; transform: translateX(-100%); transition: transform .22s ease; }
 .overlay.ol-on .outline { transform: none; }
-.ol-title { padding: 12px 18px 16px; font-size: 14.5px; font-weight: 750; line-height: 1.4; max-height: 4.3em; overflow: hidden; }
+.ol-title { flex-shrink: 0; padding: 12px 18px 0; margin-bottom: 14px; font-size: 14.5px; font-weight: 750; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: break-word; }
 .ol-title:empty { display: none; }
 .ol-tabs { display: flex; gap: 6px; padding: 2px 14px 9px; }
 .ol-tabs button { flex: 1; padding: 7px 6px; border: none; background: color-mix(in srgb, var(--ir-muted) 12%, transparent); color: var(--ir-text); border-radius: 8px; cursor: pointer; font-size: 12.5px; font-weight: 600; opacity: .68; white-space: nowrap; }
@@ -514,6 +521,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
 .bm-del.confirm { opacity: 1 !important; background: #e0533d; color: #fff; font-size: 11px; font-weight: 700; }
 .cur-chip { position: absolute; left: 16px; bottom: 14px; z-index: 6; font-size: 11.5px; opacity: .5; background: color-mix(in srgb, var(--ir-surface) 82%, transparent); backdrop-filter: blur(6px); border: 1px solid color-mix(in srgb, var(--ir-muted) 16%, transparent); padding: 4px 11px; border-radius: 999px; max-width: 52%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; transition: opacity .2s; }
 .cur-chip:hover { opacity: .92; } .cur-chip:empty { display: none; }
+.overlay.ol-on .cur-chip { display: none; }   /* the open outline already shows the current chapter — hide the chip so a long name can't leak past the panel */
 .bm-mark { color: #e8a33d; margin-right: 5px; cursor: pointer; font-size: .82em; vertical-align: .1em; }
 .body.stream .blk.bm { background: color-mix(in srgb, #e8a33d 13%, transparent); border-radius: 4px; box-shadow: -3px 0 0 0 #e8a33d; }
 .body.interactive .blk { cursor: pointer; border-radius: 4px; }
@@ -588,8 +596,9 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       </div>
       <div class="scrim" id="scrim"></div>
       <div class="panel right" id="setPanel"><h3>阅读设置 <button class="icon-btn x" id="setClose">✕</button></h3><div class="pbody" id="setBody"></div></div>
-      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlRngLbl">章节范围</span><span class="dl-rng-right"><span id="dlRngCount" aria-live="polite"></span><button class="dl-rng-all" id="dlRngAll">整本</button></span></div><div class="dl-rng-tip" id="dlRngTip" aria-live="polite"></div><div class="dl-list" id="dlList" role="listbox" aria-label="章节范围"></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
+      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlRngLbl">章节范围</span><span class="dl-rng-right"><span id="dlRngCount" aria-live="polite"></span><button class="dl-rng-all" id="dlRngAll">整本</button></span></div><div class="dl-nums"><label><span id="dlFromLbl">从</span><input type="number" id="dlFrom" min="1" value="1" inputmode="numeric" autocomplete="off"></label><span class="dl-num-sep">–</span><label><span id="dlToLbl">到</span><input type="number" id="dlTo" min="1" value="1" inputmode="numeric" autocomplete="off"></label></div><div class="dl-rng-tip" id="dlRngTip" aria-live="polite"></div><div class="dl-list" id="dlList" role="listbox" aria-label="章节范围"></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
       <div class="guide" id="guide"><div class="guide-spot" id="guideSpot"></div><div class="guide-card"><button class="guide-skip" id="guideSkip">跳过</button><div class="guide-step" id="guideStep"></div><div class="guide-t" id="guideTitle"></div><div class="guide-b" id="guideBody"></div><div class="guide-acts"><button id="guidePrev">‹ 上一步</button><div class="guide-dots" id="guideDots"></div><button id="guideNext" class="primary">下一步 ›</button></div></div></div>
+      <div class="qpop" id="qpop" role="tooltip"></div>
       <div class="toast" id="toast"></div>
     </div>`;
   const $ = (id) => root.getElementById(id);
@@ -800,7 +809,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     S.outlineTab = t; renderOutline();
   }
   function renderOutline() {
-    $('outlineTitle').textContent = S.bookTitle || (S.detail && S.detail.title) || '';
+    const otTitle = S.bookTitle || (S.detail && S.detail.title) || '';
+    $('outlineTitle').textContent = otTitle; $('outlineTitle').title = otTitle;   // full title on hover (it's clamped to 2 lines)
     const tabsWrap = $('outlineTabs');
     if (S.mode2 === 'split') {
       // split (manual chapter editing) repurposes the tab bar: red 完成 where 目录 was, 重置 where 书签 was
@@ -957,27 +967,32 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   }
 
   /* ===================== settings panel ======================= */
-  // Each ⓘ/? is a real button (data-q = help text). Click toggles a small inline note right below its
-  // row — replaces the native title= tooltip, which only appeared after a long hover.
+  // Each ? is a real button (data-q = help text). Click pops a small floating note anchored to the
+  // button — replaces the native title= tooltip (which only appeared after a long hover).
+  function hideQPop() { const p = $('qpop'); if (!p) return; p.classList.remove('show'); if (p._owner) { p._owner.classList.remove('on'); p._owner.setAttribute('aria-expanded', 'false'); } p._owner = null; }
+  function showQPop(q, txt) {
+    const p = $('qpop');
+    if (p._owner && p._owner !== q) { p._owner.classList.remove('on'); p._owner.setAttribute('aria-expanded', 'false'); }   // switching popovers
+    p.textContent = txt; p._owner = q; p.classList.add('show');
+    q.classList.add('on'); q.setAttribute('aria-expanded', 'true');
+    // position relative to the overlay (which is inset:0, so viewport coords work); right-align to the
+    // button, open downward, and flip above / clamp if it would overflow the viewport edge.
+    const r = q.getBoundingClientRect(), pr = p.getBoundingClientRect(), m = 8;
+    let left = Math.min(r.right - pr.width, window.innerWidth - pr.width - m);
+    if (left < m) left = m;
+    let top = r.bottom + 6;
+    if (top + pr.height > window.innerHeight - m) top = Math.max(m, r.top - pr.height - 6);
+    p.style.left = left + 'px'; p.style.top = top + 'px';
+  }
   function bindQmarks(scope) {
     scope.querySelectorAll('.qmark').forEach((q) => {
       const txt = q.getAttribute('data-q'); if (!txt) return;
       q.setAttribute('aria-label', t('查看说明')); q.setAttribute('aria-expanded', 'false');
-      q.onclick = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        let hint = q._hint;
-        const open = !(hint && hint._open);
-        if (!hint) {
-          hint = document.createElement('div'); hint.className = 'qhint'; hint.textContent = txt;
-          const host = q.closest('.set-sub-h') || q.closest('.grp') || q.parentElement;
-          host.insertAdjacentElement('afterend', hint); q._hint = hint;
-        }
-        hint._open = open; hint.style.display = open ? '' : 'none';
-        q.classList.toggle('on', open); q.setAttribute('aria-expanded', open ? 'true' : 'false');
-      };
+      q.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const open = $('qpop')._owner === q && $('qpop').classList.contains('show'); if (open) hideQPop(); else showQPop(q, txt); };
     });
   }
   function renderSettings() {
+    hideQPop();                                   // a re-render drops the old ? buttons → close any open help popover
     const body = $('setBody');
     const lp = llmPreset();
     const v3sel = String(settings.epubVer || 3) !== '2';
@@ -1268,31 +1283,42 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     $('dlRngLbl').textContent = t('章节范围');
     $('dlRngAll').textContent = t('整本');
     list.setAttribute('aria-label', t('章节范围'));
+    $('dlFromLbl').textContent = t('从'); $('dlToLbl').textContent = t('到');
+    const inA = $('dlFrom'), inB = $('dlTo'); inA.min = inB.min = '1'; inA.max = inB.max = String(N);
     const nm = (i) => (S.labels && S.labels[i]) || (S.toc[i] && S.toc[i].title) || ('#' + (i + 1));
     list.innerHTML = S.toc.map((c, i) => `<button class="dl-ch" role="option" aria-selected="false" data-i="${i}" title="${esc(nm(i))}"><span class="n">${i + 1}</span><span class="ttl">${esc(nm(i))}</span></button>`).join('');
     const btns = [...list.querySelectorAll('.dl-ch')];
-    // While picking the end (phase 'end'), hovering chapter `preview` shows the tentative span; otherwise
-    // the committed [dlFrom..dlTo] is shown. Endpoints get .end1, the chapters between get .in.
-    // The selected span is also exposed to assistive tech via aria-selected so it isn't visual-only.
+    // Two ways to pick, kept in sync: click a start chapter then an end chapter in the list (hotel/flight
+    // calendar style), OR just type the numbers. While picking the end (phase 'end'), hovering chapter
+    // `preview` shows the tentative span; otherwise the committed [dlFrom..dlTo] shows. Endpoints get
+    // .end1 + the chapters between get .in; the span is mirrored to aria-selected and the number inputs.
     const paint = (preview) => {
       const usePrev = (preview != null && dlPhase === 'end');
       const lo = Math.min(dlFrom, usePrev ? preview : dlTo), hi = Math.max(dlFrom, usePrev ? preview : dlTo);
-      btns.forEach((b, i) => { const on = i >= lo && i <= hi; b.classList.toggle('end1', i === lo || i === hi); b.classList.toggle('in', i > lo && i < hi); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      btns.forEach((el, i) => { const on = i >= lo && i <= hi; el.classList.toggle('end1', i === lo || i === hi); el.classList.toggle('in', i > lo && i < hi); el.setAttribute('aria-selected', on ? 'true' : 'false'); });
       $('dlRngCount').textContent = (hi - lo + 1) + ' / ' + N;
       $('dlRngTip').textContent = dlPhase === 'end' ? t('再点一章设为结束') : t('点一章设为开始，再点一章设为结束');
+      const clo = Math.min(dlFrom, dlTo) + 1, chi = Math.max(dlFrom, dlTo) + 1;   // mirror the committed span to the inputs (don't clobber the one being typed in)
+      if (root.activeElement !== inA && root.activeElement !== inB) { inA.value = String(clo); inB.value = String(chi); }
     };
-    btns.forEach((b) => {
-      b.onclick = () => {
-        const i = Number(b.dataset.i);
+    btns.forEach((el) => {
+      el.onclick = () => {
+        const i = Number(el.dataset.i);
         if (dlPhase === 'start') { dlFrom = i; dlTo = i; dlPhase = 'end'; }
         else { dlTo = i; dlPhase = 'start'; }   // dlFrom is the anchor; paint() orders lo/hi so a backward pick still works
         paint();
       };
-      b.onmouseenter = () => { if (dlPhase === 'end') paint(Number(b.dataset.i)); };
-      b.onfocus = () => { if (dlPhase === 'end') paint(Number(b.dataset.i)); };   // keyboard users see the tentative span as they tab toward the end
+      el.onmouseenter = () => { if (dlPhase === 'end') paint(Number(el.dataset.i)); };
+      el.onfocus = () => { if (dlPhase === 'end') paint(Number(el.dataset.i)); };   // keyboard users see the tentative span as they tab toward the end
     });
     list.onmouseleave = () => { if (dlPhase === 'end') paint(); };
-    list.onfocusout = (e) => { if (dlPhase === 'end' && !list.contains(e.relatedTarget)) paint(); };   // keyboard analogue of mouseleave: revert the tentative span when focus leaves the list (property-assign, like onmouseleave, so re-opens don't stack handlers)
+    list.onfocusout = (e) => { if (dlPhase === 'end' && !list.contains(e.relatedTarget)) paint(); };   // keyboard analogue of mouseleave
+    // number inputs (1-based UI <-> 0-based state). Typing previews live; blur/Enter clamps + orders.
+    const rd = (el, dflt) => { const n = parseInt(el.value, 10); return Number.isFinite(n) ? Math.min(N, Math.max(1, n)) : dflt; };
+    inA.oninput = () => { const v = rd(inA, null); if (v != null) { dlFrom = v - 1; dlPhase = 'start'; paint(); } };
+    inB.oninput = () => { const v = rd(inB, null); if (v != null) { dlTo = v - 1; dlPhase = 'start'; paint(); } };
+    const commitNums = () => { let lo = rd(inA, 1), hi = rd(inB, N); if (lo > hi) { const m = lo; lo = hi; hi = m; } dlFrom = lo - 1; dlTo = hi - 1; dlPhase = 'start'; inA.value = String(lo); inB.value = String(hi); const c = btns[dlFrom]; if (c) c.scrollIntoView({ block: 'nearest' }); paint(); };
+    inA.onchange = commitNums; inB.onchange = commitNums;
     $('dlRngAll').onclick = () => { dlFrom = 0; dlTo = N - 1; dlPhase = 'start'; paint(); btns[0] && btns[0].scrollIntoView({ block: 'nearest' }); };
     paint();
     const cur = btns[Math.min(N - 1, Math.max(0, S.idx | 0))]; cur && cur.scrollIntoView({ block: 'center' });   // anchor the list on the chapter being read (e.g. opening ch.700 of a 1000-ch series) instead of leaving it at ch.1
@@ -1371,7 +1397,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       setTimeout(() => { suppressOpen = false; }, 1800);
     }
   }
-  function togglePanel(show) { $('setPanel').classList.toggle('show', show); $('overlay').classList.toggle('panel-open', show); $('t-set').textContent = show ? '✕' : '⚙'; $('t-set').title = show ? '关闭设置' : '阅读设置'; updateScrim(); }
+  function togglePanel(show) { hideQPop(); $('setPanel').classList.toggle('show', show); $('overlay').classList.toggle('panel-open', show); $('t-set').textContent = show ? '✕' : '⚙'; $('t-set').title = show ? '关闭设置' : '阅读设置'; updateScrim(); }
   function updateTopBtn() { const el = $('scroll'); const atTop = el.scrollTop <= 60; const ic = $('r-top').querySelector('.ic'); const lb = $('r-top').querySelector('.lb'); if (atTop && savedScroll != null) { ic.textContent = '↓'; lb.textContent = t('返回'); } else { ic.textContent = '↑'; lb.textContent = t('顶部'); } }
   function toggleTop() { const el = $('scroll'); if (el.scrollTop > 60) { savedScroll = el.scrollTop; el.scrollTo({ top: 0, behavior: 'smooth' }); } else if (savedScroll != null) { el.scrollTo({ top: savedScroll, behavior: 'smooth' }); savedScroll = null; } setTimeout(updateTopBtn, 50); }
 
@@ -1382,6 +1408,16 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   const minimapOn = () => settings.minimap && (S.mode === 'stream' || S.mode === 'series') && !isMobile() && $('overlay').classList.contains('open');
   const cssVar = (n, fb) => { try { return getComputedStyle($('overlay')).getPropertyValue(n).trim() || fb; } catch { return fb; } };
   const rgba = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return 'rgba(120,120,120,' + a + ')'; const n = parseInt(m[1], 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+  // Minimap chapter tab text: prefer the chapter's OWN name over its running index ("第二章" can be the 3rd
+  // section). Pull out the essential leading token (第N章/序章/终章/番外/幕間/楔子/Chapter N/卷首…); if no such
+  // token, hard-cut the label so it can't overflow the narrow minimap.
+  const CH_TOKEN = /^[\s　【\[［（(「『]*((?:第\s*[0-9０-９一二三四五六七八九十百千零〇两兩]+\s*[章话話回卷部节節])|序\s*[章幕话話]?|[终終]\s*[章话話]?|最\s*[终終]\s*[章话話]?|尾\s*[声聲]|番\s*外|幕\s*[间間]|[间間]\s*章|楔\s*子|引\s*子|卷\s*首|プロローグ|エピローグ|あとがき|Chapter\s*\d+|Prologue|Epilogue|Part\s*\d+)/i;
+  function chapTab(label) {
+    const s = String(label || '').trim(); if (!s) return '';
+    const m = s.match(CH_TOKEN);
+    let tab = m ? m[1].replace(/\s+/g, '') : s;
+    return tab.length > 5 ? tab.slice(0, 5) : tab;   // fall back to a hard cut so it never overflows
+  }
   function buildMinimap() {
     const mm = $('minimap'), ov = $('overlay'), content = $('content');
     const body = content && content.querySelector('.body');
@@ -1420,13 +1456,17 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       try { if (img.complete && img.naturalWidth) fx.drawImage(img, x, y, iw, h); else { fx.fillStyle = rgba(cssVar('--ir-muted', '#888'), 0.45); fx.fillRect(x, y, iw, h); } }
       catch { fx.fillStyle = rgba(cssVar('--ir-muted', '#888'), 0.45); fx.fillRect(x, y, iw, h); }
     });
-    // chapter divider lines + a numbered label tab on the left — bold & noticeable
-    fx.textBaseline = 'middle'; fx.textAlign = 'center'; fx.font = '700 10px system-ui,-apple-system,sans-serif';
+    // chapter divider lines + a NAME tab on the left (the chapter's own name, not its running index)
+    fx.textBaseline = 'middle'; fx.textAlign = 'center'; fx.font = '700 9px system-ui,-apple-system,sans-serif';
     let lastLbl = -999;
     [...body.querySelectorAll('section.ch')].forEach((sec, i) => {
       const top = yOf(sec);
       if (i > 0) { fx.fillStyle = '#6366f1'; fx.fillRect(0, Math.round(top) - 1, W, 2.6); }   // thicker full-width divider
-      if (top - lastLbl >= 16) { lastLbl = top; const n = String(i + 1), tw = n.length > 2 ? 26 : 20; fx.fillStyle = '#4f46e5'; fx.fillRect(0, top, tw, 15); fx.fillStyle = '#fff'; fx.fillText(n, tw / 2, top + 8); }   // bigger, bolder number tab
+      if (top - lastLbl >= 16) {
+        lastLbl = top;
+        const txt = chapTab(S.secLabels[i] || (S.sections[i] && S.sections[i].title) || ('#' + (i + 1)));
+        if (txt) { const tw = Math.min(W * 0.66, Math.ceil(fx.measureText(txt).width) + 8); fx.fillStyle = '#4f46e5'; fx.fillRect(0, top, tw, 14); fx.fillStyle = '#fff'; fx.fillText(txt, tw / 2, top + 7.5); }
+      }
     });
     // bookmarks → very noticeable: strong amber band + a bold amber tab on BOTH edges
     body.querySelectorAll('.blk.bm').forEach((el) => {
@@ -1577,11 +1617,15 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   window.addEventListener('keydown', (e) => {
     if (!$('overlay').classList.contains('open')) return;
     if (/^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) return;
-    if (e.key === 'Escape') { if ($('guide').classList.contains('show')) closeGuide(); else if ($('dlg').classList.contains('show')) closeDlg(); else if (S.mode2 === 'split') exitMode(); else if (S.mode2 === 'bookmark') selectOutlineTab('toc'); else if ($('setPanel').classList.contains('show')) togglePanel(false); else if (isMobile() && $('overlay').classList.contains('ol-on')) openOutline(false); else closeReader(); }
+    if (e.key === 'Escape') { if ($('qpop').classList.contains('show')) hideQPop(); else if ($('guide').classList.contains('show')) closeGuide(); else if ($('dlg').classList.contains('show')) closeDlg(); else if (S.mode2 === 'split') exitMode(); else if (S.mode2 === 'bookmark') selectOutlineTab('toc'); else if ($('setPanel').classList.contains('show')) togglePanel(false); else if (isMobile() && $('overlay').classList.contains('ol-on')) openOutline(false); else closeReader(); }
     else if (!$('guide').classList.contains('show') && !$('dlg').classList.contains('show')) {   // don't page the reader behind an open guide/dialog (they capture pointer events but keyboard bubbles to window)
       if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); } else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
     }
   });
+  // close the ? help popover on an outside click, when the settings list scrolls, or on resize
+  root.addEventListener('pointerdown', (e) => { const p = $('qpop'); if (!p.classList.contains('show')) return; const path = e.composedPath ? e.composedPath() : []; if (path.includes(p)) return; if (e.target && e.target.closest && e.target.closest('.qmark')) return; hideQPop(); }, true);
+  $('setBody').addEventListener('scroll', hideQPop, { passive: true });
+  window.addEventListener('resize', hideQPop);
 
   /* ============== per-card 📖 buttons on list pages =============== */
   const currentAid = () => { const m = location.pathname.match(/\/detail\/(\d+)/); return m ? Number(m[1]) : null; };
