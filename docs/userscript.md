@@ -2,7 +2,7 @@
 
 A single-file Tampermonkey userscript that injects a clean, Google-Docs-style **immersive reader** onto the live site `www.lightnovel.fun` *without replacing it*. Everything lives in one IIFE; the UI is mounted in a Shadow DOM so the host page's CSS can never touch it. This document maps the code so a human or an LLM agent can read, operate, and extend it.
 
-> File: `lightnovel-immersive-reader.user.js` · `@version 1.17.0` · vanilla JS, no dependencies.
+> File: `lightnovel-immersive-reader.user.js` · `@version 1.18.0` · vanilla JS, no dependencies.
 
 ---
 
@@ -40,7 +40,7 @@ const $ = (id) => root.getElementById(id);
 | `close` | `.exit-btn` | "✕ 退出" |
 | `rail` / `r-prev` / `r-next` / `r-top` | right floating rail | Prev/next chapter, back-to-top |
 | `setPanel` / `setBody` / `setClose` | right slide-in | Settings panel |
-| `dlg` / `dlgT` / `dlgMsg` / `dlRange` / `dlFrom` / `dlTo` / `dlgActs` / `dl-lib` / `dl-epub` / `dl-txt` / `dlgClose` | download dialog | Export / send-to-library modal |
+| `dlg` / `dlgT` / `dlgMsg` / `dlRange` / `dlList` / `dlRngAll` / `dlRngTip` / `dlRngCount` / `dlgActs` / `dl-lib` / `dl-epub` / `dl-txt` / `dlgClose` | download dialog | Export / send-to-library modal (the list-based chapter range picker lives in `#dlRange`; `dlFrom`/`dlTo`/`dlPhase` are module-level **variables**, not DOM ids) |
 | `guide` / `guideSpot` / `guideStep` / `guideTitle` / `guideBody` / `guidePrev` / `guideNext` / `guideDots` / `guideSkip` | feature guide | Re-openable step-by-step tour |
 | `scrim` | `.scrim` | Dim backdrop behind panel / mobile outline |
 | `toast` | `.toast` | Transient toast (`flashToast`) |
@@ -264,7 +264,9 @@ Wired into the scroll handler (`scheduleSaveProg`, line 1382) and `closeReader` 
 
 `renderSettings()` (lines 847–937) builds the right slide-in. Fields write straight to the `settings` object and persist via `saveSettings()` (localStorage key `LS_SETTINGS = 'lkir_settings'`). `DEFAULTS` at lines 42–44 (now including `epubVer: 3`).
 
-The panel is organized so the everyday controls sit at the top, a **下载 EPUB 版本** segmented control sits below the resume controls, and the two integrations with external services are **collapsed by default** under native `<details class="set-fold">` blocks tagged 实验性 (`.set-tag`).
+The panel is organized so the everyday controls sit at the top, a **下载 EPUB 版本** segmented control sits below the resume controls, and the two integrations with external services are **collapsed by default** behind an accessible disclosure: a `#s-adv-toggle` button (`aria-expanded`, `aria-controls="s-adv-body"`) toggles the `#s-adv-body` region (`role="region"`, `hidden` when collapsed); its open/closed state persists via `settings.foldAdv`. Inside that region the Calibre and LLM integrations are each a `<section class="set-sub">` tagged 实验性 (`.set-tag`).
+
+Inline help is **click-to-toggle**, not a native `title=` tooltip: a small `.qmark` button (`data-q="…"`) next to a control toggles an inline `.qhint` note rendered just under its row. `bindQmarks(scope)` wires these after each `renderSettings()`.
 
 | Control id | `settings` key | Notes |
 |---|---|---|
@@ -278,8 +280,9 @@ The panel is organized so the everyday controls sit at the top, a **下载 EPUB 
 | `#s-progexp` / `#s-progimp` / `#s-progfile` | — | export / import progress |
 | `#s-epubver` | `epubVer` | **EPUB 3 / EPUB 2** segmented control; `3` (default) builds EPUB3, `2` the legacy fallback |
 | `#s-guide` | — | re-open feature guide |
-| `#s-lib` / `#s-liburl` / `#s-libtoken` / `#s-libtest` | `libEnable` / `libUrl` / `libToken` | **inside `<details>` (实验性, collapsed)** — Calibre bridge (test → `GET /api/health`) |
-| `#s-llm` / `#s-llmprov` / `#s-llmbase` / `#s-llmkey` / `#s-llmmodel` / `#s-llmtest` | `llmEnable` / `llmProvider` / `llmBase` / `llmKey` / `llmModel` | **inside `<details>` (实验性, collapsed)** — optional LLM metadata; test runs `ensureLLMMeta(S.aid, true)` |
+| `#s-adv-toggle` / `#s-adv-body` | `foldAdv` | Disclosure button + region wrapping the two experimental integrations below |
+| `#s-lib` / `#s-liburl` / `#s-libtoken` / `#s-libtest` | `libEnable` / `libUrl` / `libToken` | **inside `#s-adv-body` (实验性, collapsed)** — Calibre bridge (test → `GET /api/health`) |
+| `#s-llm` / `#s-llmprov` / `#s-llmbase` / `#s-llmkey` / `#s-llmmodel` / `#s-llmtest` | `llmEnable` / `llmProvider` / `llmBase` / `llmKey` / `llmModel` | **inside `#s-adv-body` (实验性, collapsed)** — optional LLM metadata; test runs `ensureLLMMeta(S.aid, true)` |
 
 > Experimental / at-your-own-risk: the **发送到书库 (Calibre)** bridge and the **LLM 整理元数据** integration connect to external services (the local bridge and a third-party LLM host), may incur cost, and are used at the user's own risk. API keys and the bridge token are stored **in plaintext in this browser's localStorage** and entered at runtime — never hardcode them.
 
@@ -294,7 +297,8 @@ These are documented in depth elsewhere; the entry points relevant to the reader
   - **EPUB3 (default, verified epubcheck-clean):** `version="3.0"` package; MARC relator roles via `<dc:creator|contributor id>` + `<meta refines="#id" property="role" scheme="marc:relators">`; series via `belongs-to-collection` (+ `collection-type=series`, `group-position`) **and** the legacy `calibre:series` meta for round-tripping; a proper XHTML **Navigation Document** (`<nav epub:type="toc">`, manifest `properties="nav"`); a `<meta property="dcterms:modified">` timestamp; cover marked via `properties="cover-image"` on the image item.
   - **EPUB2 (fallback):** `version="2.0"`, `opf:role`/`opf:file-as` on creators, `calibre:series`, and the `<meta name="cover">` pointer.
   - Both versions embed reachable images + the cover, write the same NCX, and write searchable `dc:subject` tags for credits that don't round-trip natively. **Images that can't be embedded (fetch failed) are dropped** so the EPUB is always self-contained (no remote refs); LK's custom `img-width`/`img-height`/`loading`/etc. attributes are stripped from `<img>`.
-- **Download flow**: `openDlg`/`closeDlg` (1106–1118), `doExport(kind)` (1152–1169), `doSendToLib` (1119–1137), `gatherBook(onP, range)` (1138–1151, series supports a chapter range). `S.busy` guards re-entry.
+- **Download flow**: `openDlg`/`closeDlg`, `doExport(kind)`, `doSendToLib`, `gatherBook(onP, range)` (series supports a chapter range). `S.busy` guards re-entry.
+- **Range picker** (series only, `S.toc.length > 1`): `buildDlRange()` renders `#dlList` as a list of `.dl-ch` chapter buttons (a `role="listbox"` of `role="option"` items) and works hotel/calendar-style — click a start chapter, then an end chapter; the span fills in. The selection is held in the module-level variables `dlFrom` / `dlTo` (0-based, inclusive) plus a two-phase cursor `dlPhase` (`'start'` → `'end'`); `paint()` orders lo/hi (so a backward pick still works), toggles `.end1`/`.in` + `aria-selected`, and updates `#dlRngTip` / `#dlRngCount` (both `aria-live="polite"`). Hover **and** keyboard focus on a chapter preview the tentative span while in the `'end'` phase. `#dlRngAll` resets to the whole book (the default). `getDlRange()` reads the committed `{from, to}` back for `gatherBook`.
 - **Credit parsing**: `extractCredits(raw)` (939–965) — rule-based 作者/翻译/插画/图源/录入/原作. **The site's reported author is the uploader; the real author is the in-text 作者.** `buildLibMeta(llm)` (1010–1050) merges site + regex + (optional) LLM fields.
 - **LLM path**: `LLM_PRESETS` (deepseek / openai / kimicode, lines 966–972), `extractMetaLLM` (983–1002, OpenAI-compatible `/chat/completions` *or* Anthropic `/v1/messages` for Kimi Code), `ensureLLMMeta` (1003–1009, cache-first per aid under `LS_META = 'lir_meta_cache'`). Sends **only the short 卷首 credit block**, never the book.
 
@@ -302,7 +306,7 @@ These are documented in depth elsewhere; the entry points relevant to the reader
 
 ## 13. Feature guide
 
-`GUIDE` (lines 1291–1304) is now a **12-step** array `[{t, b, hl, open?, reveal?, panel?}]`. The steps walk through both the reader UI **and** the settings panel: outline (▤), download corner (⤓), manual split, bookmarks, volumes, navigation rail / minimap, the settings gear (⚙), theme/appearance, the **下载 EPUB 版本** control, resume/progress transfer, the **experimental folds** (Calibre + LLM), and finally 退出.
+`GUIDE` is an **11-step** array `[{t, b, hl, open?, reveal?, panel?}]`. The steps walk through both the reader UI **and** the settings panel: outline (☰), download corner (⤓), manual split, bookmarks, volumes, navigation rail / minimap, the settings gear (⚙), theme/appearance, resume/progress transfer, the **高级 / 实验性功能** disclosure (`#s-adv-toggle`, holding Calibre + LLM), and finally 退出.
 
 `openGuide`/`showGuideStep`/`placeSpot` (1307–1341) drive a spotlight (`#guideSpot`) over a highlighted element (`hl` selector). Step flags:
 

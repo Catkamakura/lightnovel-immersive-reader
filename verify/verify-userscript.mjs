@@ -205,7 +205,7 @@ async function run() {
     }, 300));
   });
   console.log('  guide:', JSON.stringify(guide));
-  check('D: guide opens from settings (stepped, with dots)', guide.shown && guide.dots === 7 && guide.t1.length > 0);
+  check('D: guide opens from settings (stepped, with dots)', guide.shown && guide.dots === 11 && guide.t1.length > 0);
   check('D: guide spotlight dims around the focus (hole + shadow)', guide.spotShown && guide.spotW > 0 && /9999px|rgba/.test(guide.spotShadow), `w=${guide.spotW}`);
   check('D: guide advances + highlights a control', /^3 \//.test(guide.stepTxt) && guide.hl);
   check('D: finishing closes guide + spotlight + marks seen', guide.closed && guide.spotHidden && guide.guided === '1');

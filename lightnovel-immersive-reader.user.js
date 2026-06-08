@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.17.0
+// @version      1.18.0
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
@@ -62,6 +62,7 @@
     '目录': 'Contents', '书签': 'Bookmarks', '分卷': 'Volumes', '未完成': 'todo',
     '下载 / 发送整本': 'Download / Send', '下载 / 发送（可选章节范围）': 'Download / Send (chapter range)', '下载 / 发送整本（全书）': 'Download / Send (whole book)',
     '选择导出格式': 'Choose a format', '从': 'From', '到': 'To', '章节范围': 'Chapter range',
+    '选择章节范围': 'Choose a chapter range', '整本': 'All', '再点一章设为结束': 'Now tap the end chapter', '点一章设为开始，再点一章设为结束': 'Tap a chapter to start, then another to end',
     '📚 发送到书库（Calibre）': '📚 Send to library (Calibre)', '📖 EPUB（封面+插图）': '📖 EPUB (cover + images)', '📄 TXT（纯文本）': '📄 TXT (plain text)', '取消': 'Cancel',
     '跳过': 'Skip', '‹ 上一步': '‹ Back', '下一步 ›': 'Next ›', '完成 ✓': 'Done ✓',
     // settings
@@ -73,7 +74,7 @@
     '导出进度': 'Export', '导入进度': 'Import', '进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。': 'Progress is stored locally per signed-in account; export then import to move it between devices (never mixed across accounts).',
     '📖 功能向导 / 使用说明': '📖 Feature guide', '界面做了精简、很多功能被收了起来；忘记某个功能怎么用时，随时点这里重看分步引导。': 'The UI is intentionally minimal and tucks features away — open this anytime for the step-by-step guide.',
     '下载 EPUB 版本': 'EPUB version', '默认生成更规范的 EPUB 3（现行标准）；个别老设备 / 老阅读器不兼容时再切回 EPUB 2。': 'Generates the more standards-compliant EPUB 3 by default; switch to EPUB 2 only for older devices/readers.',
-    '高级（实验性）': 'Advanced (experimental)', '实验性': 'experimental',
+    '高级（实验性）': 'Advanced (experimental)', '高级 / 实验性功能': 'Advanced (experimental)', '实验性': 'experimental', '查看说明': 'Show help',
     '发送到书库（Calibre）': 'Send to library (Calibre)', '启用书库': 'Enable library', 'Token（可选，留空即不校验）': 'Token (optional)',
     '测试连接': 'Test connection', '连接中…': 'Connecting…', '请先填写书库地址': 'Enter the library address first',
     '用 LLM 整理元数据': 'Tidy metadata with an LLM', '启用 LLM 整理': 'Enable LLM tidy-up', 'API Key（仅存于本机浏览器）': 'API key (kept in this browser only)',
@@ -418,19 +419,24 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
 .cat-item { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; border: none; background: none; color: inherit; cursor: pointer; padding: 9px 8px; border-radius: 8px; font-size: 13px; opacity: .8; } .cat-item:hover { background: color-mix(in srgb, var(--ir-muted) 14%, transparent); opacity: 1; } .cat-item.active { color: #6366f1; font-weight: 650; opacity: 1; background: color-mix(in srgb, #6366f1 12%, transparent); } .cat-item .n { flex-shrink: 0; min-width: 1.8em; text-align: right; opacity: .45; }
 .scrim { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.25); display: none; } .scrim.show { display: block; }
 .loading { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ir-muted); font-size: 14px; }
-.dlg { position: absolute; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.4); } .dlg.show { display: flex; } .dlg-card { width: 320px; background: var(--ir-surface); color: var(--ir-text); border-radius: 16px; padding: 22px; box-shadow: 0 16px 50px rgba(0,0,0,.4); text-align: center; } .dlg-card .t { font-size: 17px; font-weight: 800; margin-bottom: 6px; } .dlg-card .m { font-size: 13px; opacity: .65; margin-bottom: 18px; min-height: 1.2em; } .dlg-card .acts { display: flex; flex-direction: column; gap: 10px; } .dlg-card .acts button { padding: 12px; border-radius: 11px; border: none; cursor: pointer; font-size: 14px; font-weight: 700; } .dl-range { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; text-align: left; }
-.dl-rng-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
-#dlRngCount { font-weight: 400; opacity: .55; font-size: 11px; }
-.dl-num-row { display: flex; align-items: center; gap: 10px; }
-.dl-num { flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
-.dl-num > span { font-size: 12px; opacity: .6; flex-shrink: 0; }
-.dl-num input[type="number"] { flex: 1; min-width: 0; width: 100%; padding: 8px 10px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--ir-muted) 34%, transparent); background: color-mix(in srgb, var(--ir-muted) 8%, transparent); color: var(--ir-text); font-size: 14px; font-weight: 700; text-align: center; box-sizing: border-box; }
-.dl-num input[type="number"]:focus { outline: none; border-color: #6366f1; }
-.dl-num-dash { opacity: .5; font-weight: 700; }
-.dl-rng-names { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; opacity: .62; margin-top: 6px; min-height: 1.2em; }
-.dl-rng-names span { max-width: 47%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dl-rng-names span:last-child { text-align: right; }
-.dlg-card .acts .lib { background: linear-gradient(120deg,#6366f1,#a855f7); color: #fff; } .dlg-card .acts .epub { background: color-mix(in srgb, #6366f1 16%, transparent); color: var(--ir-text); } .dlg-card .acts .txt { background: color-mix(in srgb, var(--ir-muted) 18%, transparent); color: var(--ir-text); } .dlg-card .cancel { margin-top: 14px; border: none; background: none; color: var(--ir-muted); cursor: pointer; font-size: 13px; }
+.dlg { position: absolute; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.4); } .dlg.show { display: flex; } .dlg-card { width: 320px; max-height: 90vh; overflow-y: auto; background: var(--ir-surface); color: var(--ir-text); border-radius: 16px; padding: 22px; box-shadow: 0 16px 50px rgba(0,0,0,.4); text-align: center; } .dlg-card .t { font-size: 17px; font-weight: 800; margin-bottom: 6px; } .dlg-card .m { font-size: 13px; opacity: .65; margin-bottom: 18px; min-height: 1.2em; } .dlg-card .acts { display: flex; flex-direction: column; gap: 10px; } .dlg-card .acts button { padding: 12px; border-radius: 11px; border: none; cursor: pointer; font-size: 14px; font-weight: 700; } .dl-range { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; text-align: left; }
+.dl-rng-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.dl-rng-right { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+#dlRngCount { opacity: .55; font-size: 11px; font-variant-numeric: tabular-nums; }
+.dl-rng-all { border: 1px solid color-mix(in srgb, var(--ir-muted) 30%, transparent); background: none; color: var(--ir-text); border-radius: 7px; padding: 3px 9px; cursor: pointer; font-size: 11px; opacity: .82; }
+.dl-rng-all:hover { opacity: 1; border-color: #6366f1; color: #6366f1; }
+.dl-rng-tip { font-size: 11px; opacity: .6; margin-bottom: 8px; line-height: 1.4; min-height: 1.3em; }
+/* the chapter range picker: click a start chapter, then an end chapter (hotel/flight style) */
+.dlg-card.has-range { width: 380px; max-width: 92vw; }
+.dl-list { max-height: 44vh; overflow-y: auto; margin: 0 0 14px; border: 1px solid color-mix(in srgb, var(--ir-muted) 22%, transparent); border-radius: 10px; padding: 4px; }
+.dl-ch { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; border: none; background: none; color: inherit; cursor: pointer; padding: 7px 9px; border-radius: 7px; font-size: 12.5px; opacity: .85; }
+.dl-ch:hover { background: color-mix(in srgb, var(--ir-muted) 14%, transparent); opacity: 1; }
+.dl-ch .n { flex-shrink: 0; min-width: 2.2em; text-align: right; opacity: .45; font-variant-numeric: tabular-nums; }
+.dl-ch .ttl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-ch.in { background: color-mix(in srgb, #6366f1 13%, transparent); opacity: 1; }
+.dl-ch.end1 { background: #4f46e5; color: #fff; opacity: 1; font-weight: 650; }
+.dl-ch.end1 .n { opacity: .85; color: #fff; }
+.dlg-card .acts .lib { background: #4f46e5; color: #fff; } .dlg-card .acts .lib:hover { background: #4338ca; } .dlg-card .acts .epub { background: color-mix(in srgb, #6366f1 16%, transparent); color: var(--ir-text); } .dlg-card .acts .txt { background: color-mix(in srgb, var(--ir-muted) 18%, transparent); color: var(--ir-text); } .dlg-card .cancel { margin-top: 14px; border: none; background: none; color: var(--ir-muted); cursor: pointer; font-size: 13px; }
 .ch-sep { height: 0; border-top: 1px dashed color-mix(in srgb, var(--ir-muted) 32%, transparent); margin: 2.4em auto 1.8em; max-width: 60%; }
 .ch-inner { display: block; }
 .body.editing .ch-inner { font-size: .94em; }
@@ -454,14 +460,26 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
 .cat-note { opacity: .5; font-size: 13px; padding: 8px 14px; line-height: 1.65; }
 .set-btn { width: 100%; border: 1px solid color-mix(in srgb, var(--ir-muted) 30%, transparent); background: color-mix(in srgb, #6366f1 8%, transparent); color: var(--ir-text); border-radius: 10px; padding: 10px; cursor: pointer; font-size: 13.5px; font-weight: 600; }
 .set-hint { font-size: 11.5px; opacity: .5; margin-top: 7px; line-height: 1.5; }
-.set-fold { border-top: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); padding: 12px 0 2px; }
-.set-fold > summary { list-style: none; cursor: pointer; font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 8px; user-select: none; }
-.set-fold > summary::-webkit-details-marker { display: none; }
-.set-fold > summary::before { content: '▸'; opacity: .55; font-size: 11px; transition: transform .15s; }
-.set-fold[open] > summary::before { transform: rotate(90deg); }
+/* advanced / experimental — accessible disclosure (button + region), not <details> */
+.set-adv { border-top: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); margin-top: 16px; padding-top: 4px; }
+.set-adv-h { width: 100%; display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--ir-text); cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; padding: 10px 2px; }
+.set-adv-h .set-adv-caret { margin-left: auto; opacity: .55; font-size: 11px; transition: transform .15s; }
+.set-adv-h[aria-expanded="true"] .set-adv-caret { transform: rotate(90deg); }
+.set-adv-body[hidden] { display: none; }
+.set-adv-body { padding-top: 2px; }
+.set-sub { padding-top: 14px; margin-top: 6px; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 14%, transparent); }
+.set-sub:first-child { border-top: none; padding-top: 4px; margin-top: 0; }
+.set-sub-h { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 650; margin-bottom: 4px; }
 .set-tag { font-size: 10px; font-weight: 600; color: #c9702f; background: color-mix(in srgb, #c9702f 14%, transparent); border-radius: 6px; padding: 1px 6px; }
-.qmark { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%; font-size: 10px; font-weight: 700; background: color-mix(in srgb, var(--ir-muted) 26%, transparent); color: var(--ir-text); cursor: help; opacity: .65; vertical-align: middle; }
+.qmark { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: none; border-radius: 50%; font-size: 10px; font-weight: 700; line-height: 1; background: color-mix(in srgb, var(--ir-muted) 26%, transparent); color: var(--ir-text); cursor: pointer; opacity: .65; vertical-align: middle; flex-shrink: 0; font-family: inherit; }
 .qmark:hover { opacity: 1; }
+.qmark.on { opacity: 1; background: color-mix(in srgb, #6366f1 80%, transparent); color: #fff; }
+.qhint { font-size: 11.5px; opacity: .72; line-height: 1.55; margin: -10px 2px 12px; padding: 9px 11px; background: color-mix(in srgb, var(--ir-muted) 12%, transparent); border-radius: 8px; }
+/* toggle rows are real <label>s so clicking the text flips the checkbox */
+.toggle { cursor: pointer; gap: 6px; }
+.toggle .lbl { margin: 0; }
+.toggle input[type=checkbox] { margin-left: auto; }
+input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .toast { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(10px); z-index: 40; background: rgba(20,22,28,.94); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .outline { position: absolute; left: 0; top: 0; bottom: 0; width: 312px; max-width: 86vw; z-index: 12; background: var(--ir-bg); display: flex; flex-direction: column; padding-top: 60px; transform: translateX(-100%); transition: transform .22s ease; }
@@ -535,7 +553,7 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
 .guide-spot { position: absolute; border-radius: 10px; border: 2px solid color-mix(in srgb, #6366f1 85%, transparent); box-shadow: 0 0 0 9999px rgba(0,0,0,.55); pointer-events: none; display: none; transition: top .18s ease, left .18s ease, width .18s ease, height .18s ease; }
 .guide.show .guide-spot { display: block; }
 .overlay.guide-reveal .cbtn.reveal { opacity: .95 !important; transform: none !important; }   /* reveal = make the hover button visible, NOT interactive (the guide blocks clicks) */
-.launch { position: fixed; right: 116px; bottom: 26px; z-index: 2147482000; display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border: none; cursor: pointer; border-radius: 999px; background: linear-gradient(120deg,#6366f1,#a855f7); color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 8px 24px rgba(99,102,241,.45); font-family: system-ui,sans-serif; transition: transform .15s; } .launch:hover { transform: translateY(-2px); }
+.launch { position: fixed; right: 116px; bottom: 26px; z-index: 2147482000; display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border: none; cursor: pointer; border-radius: 999px; background: #4f46e5; color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.18); font-family: system-ui,sans-serif; transition: transform .15s, background .15s; } .launch:hover { transform: translateY(-2px); background: #4338ca; }
 @media (max-width: 820px) { .launch { right: 16px; } }
 `;
 
@@ -570,7 +588,7 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
       </div>
       <div class="scrim" id="scrim"></div>
       <div class="panel right" id="setPanel"><h3>阅读设置 <button class="icon-btn x" id="setClose">✕</button></h3><div class="pbody" id="setBody"></div></div>
-      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlRngLbl">章节范围</span><span id="dlRngCount"></span></div><div class="dl-num-row"><label class="dl-num"><span id="dlFromLbl">从</span><input type="number" id="dlFrom" min="1" value="1" inputmode="numeric" autocomplete="off"></label><span class="dl-num-dash">–</span><label class="dl-num"><span id="dlToLbl">到</span><input type="number" id="dlTo" min="1" value="1" inputmode="numeric" autocomplete="off"></label></div><div class="dl-rng-names"><span id="dlFromName"></span><span id="dlToName"></span></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
+      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlRngLbl">章节范围</span><span class="dl-rng-right"><span id="dlRngCount" aria-live="polite"></span><button class="dl-rng-all" id="dlRngAll">整本</button></span></div><div class="dl-rng-tip" id="dlRngTip" aria-live="polite"></div><div class="dl-list" id="dlList" role="listbox" aria-label="章节范围"></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
       <div class="guide" id="guide"><div class="guide-spot" id="guideSpot"></div><div class="guide-card"><button class="guide-skip" id="guideSkip">跳过</button><div class="guide-step" id="guideStep"></div><div class="guide-t" id="guideTitle"></div><div class="guide-b" id="guideBody"></div><div class="guide-acts"><button id="guidePrev">‹ 上一步</button><div class="guide-dots" id="guideDots"></div><button id="guideNext" class="primary">下一步 ›</button></div></div></div>
       <div class="toast" id="toast"></div>
     </div>`;
@@ -585,6 +603,7 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
   let pageAid = null;        // the aid the underlying site page is showing (null if opened from a list)
   let suppressOpen = false;  // briefly ignore auto-open right after we sync the site URL on close
   let suppressTocHover = false; // after clicking onto 目录, don't show the 调整分章 hover until the mouse leaves
+  let dlFrom = 0, dlTo = 0, dlPhase = 'start'; // series download range picker (0-based inclusive; phase = which click comes next)
   function resetState(aid) {
     S = { aid, detail: null, raw: '', rawLen: 0, author: '', bookTitle: '', busy: false, mode: 'stream', mode2: 'read',
       blocks: [], bclean: [], bounds: [], catalog: [], sections: [], secLabels: [], cat: [], catLabels: [], manualSplit: false,
@@ -938,6 +957,26 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
   }
 
   /* ===================== settings panel ======================= */
+  // Each ⓘ/? is a real button (data-q = help text). Click toggles a small inline note right below its
+  // row — replaces the native title= tooltip, which only appeared after a long hover.
+  function bindQmarks(scope) {
+    scope.querySelectorAll('.qmark').forEach((q) => {
+      const txt = q.getAttribute('data-q'); if (!txt) return;
+      q.setAttribute('aria-label', t('查看说明')); q.setAttribute('aria-expanded', 'false');
+      q.onclick = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        let hint = q._hint;
+        const open = !(hint && hint._open);
+        if (!hint) {
+          hint = document.createElement('div'); hint.className = 'qhint'; hint.textContent = txt;
+          const host = q.closest('.set-sub-h') || q.closest('.grp') || q.parentElement;
+          host.insertAdjacentElement('afterend', hint); q._hint = hint;
+        }
+        hint._open = open; hint.style.display = open ? '' : 'none';
+        q.classList.toggle('on', open); q.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+    });
+  }
   function renderSettings() {
     const body = $('setBody');
     const lp = llmPreset();
@@ -952,32 +991,37 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
        <div class="grp"><div class="lbl">${t('行距')} <b id="v-lh">${settings.lineHeight.toFixed(1)}</b></div><input type="range" id="s-lh" min="1.4" max="2.6" step="0.1" value="${settings.lineHeight}"></div>
        <div class="grp"><div class="lbl">${t('页宽')} <b id="v-w">${settings.width}</b></div><input type="range" id="s-w" min="560" max="1000" step="20" value="${settings.width}"></div>
        <div class="grp"><div class="lbl">${t('字体')}</div><div class="seg" id="s-font"><button data-f="system" class="${settings.font === 'system' ? 'active' : ''}">${t('系统')}</button><button data-f="sans" class="${settings.font === 'sans' ? 'active' : ''}">${t('黑体')}</button><button data-f="serif" class="${settings.font === 'serif' ? 'active' : ''}">${t('宋体')}</button></div></div>
-       <div class="grp toggle"><div class="lbl" style="margin:0">${t('显示目录侧栏（电脑端）')}</div><input type="checkbox" id="s-outline" ${settings.showOutline ? 'checked' : ''}></div>
-       <div class="grp toggle"><div class="lbl" style="margin:0">${t('右侧缩略图 Minimap（电脑端）')}</div><input type="checkbox" id="s-minimap" ${settings.minimap ? 'checked' : ''}></div>
-       <div class="grp toggle"><div class="lbl" style="margin:0">${t('进入详情页自动沉浸')}</div><input type="checkbox" id="s-auto" ${settings.autoOpen ? 'checked' : ''}></div>
-       <div class="grp toggle"><div class="lbl" style="margin:0">${t('阅读进度')}<span class="qmark" title="${esc(t('网文回到上次看的章节，单篇回到上次的位置'))}">?</span></div><input type="checkbox" id="s-resume" ${settings.resume ? 'checked' : ''}></div>
-       <div class="grp" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="set-btn" id="s-progexp" style="flex:1">⤓ ${t('导出进度')}</button><button class="set-btn" id="s-progimp" style="flex:1">⤒ ${t('导入进度')}</button><span class="qmark" title="${esc(t('进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。'))}">?</span><input type="file" id="s-progfile" accept="application/json,.json" style="display:none"></div>
-       <div class="grp"><button class="set-btn" id="s-guide">${t('📖 功能向导 / 使用说明')}<span class="qmark" title="${esc(t('界面做了精简、很多功能被收了起来；忘记某个功能怎么用时，随时点这里重看分步引导。'))}">?</span></button></div>
-       <details class="set-fold" id="s-fold-adv" ${settings.foldAdv ? 'open' : ''}><summary>${t('高级（实验性）')}</summary>
-         <div class="grp" style="margin-top:10px"><div class="lbl">${t('下载 EPUB 版本')}</div><div class="seg" id="s-epubver"><button data-v="3" class="${v3sel ? 'active' : ''}">EPUB&nbsp;3</button><button data-v="2" class="${!v3sel ? 'active' : ''}">EPUB&nbsp;2</button></div><div class="set-hint">${t('默认生成更规范的 EPUB 3（现行标准）；个别老设备 / 老阅读器不兼容时再切回 EPUB 2。')}</div></div>
-         <div class="grp" style="border-top:1px solid color-mix(in srgb,var(--ir-muted) 16%,transparent);padding-top:12px"><div class="lbl">📚 ${t('发送到书库（Calibre）')} <span class="set-tag">${t('实验性')}</span><span class="qmark" title="${esc(t('需自行搭建 calibre-bridge 并允许脚本连接该地址，自担风险。'))}">?</span></div>
-           <div class="grp toggle" style="margin:8px 0 0"><div class="lbl" style="margin:0">${t('启用书库')}</div><input type="checkbox" id="s-lib" ${settings.libEnable ? 'checked' : ''}></div>
-           <input type="text" id="s-liburl" class="lib-in" value="${esc(settings.libUrl || '')}" placeholder="http://127.0.0.1:8788">
-           <input type="text" id="s-libtoken" class="lib-in" value="${esc(settings.libToken || '')}" placeholder="${esc(t('Token（可选，留空即不校验）'))}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
-           <button class="set-btn" id="s-libtest">${t('测试连接')}</button>
-           <div class="set-hint" id="libHint"></div>
+       <label class="grp toggle"><span class="lbl">${t('显示目录侧栏（电脑端）')}</span><input type="checkbox" id="s-outline" ${settings.showOutline ? 'checked' : ''}></label>
+       <label class="grp toggle"><span class="lbl">${t('右侧缩略图 Minimap（电脑端）')}</span><input type="checkbox" id="s-minimap" ${settings.minimap ? 'checked' : ''}></label>
+       <label class="grp toggle"><span class="lbl">${t('进入详情页自动沉浸')}</span><input type="checkbox" id="s-auto" ${settings.autoOpen ? 'checked' : ''}></label>
+       <label class="grp toggle"><span class="lbl">${t('阅读进度')}</span><button type="button" class="qmark" data-q="${esc(t('网文回到上次看的章节，单篇回到上次的位置'))}">?</button><input type="checkbox" id="s-resume" ${settings.resume ? 'checked' : ''}></label>
+       <div class="grp" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="set-btn" id="s-progexp" style="flex:1">⤓ ${t('导出进度')}</button><button class="set-btn" id="s-progimp" style="flex:1">⤒ ${t('导入进度')}</button><button type="button" class="qmark" data-q="${esc(t('进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。'))}">?</button><input type="file" id="s-progfile" accept="application/json,.json" style="display:none"></div>
+       <div class="grp" style="display:flex;gap:8px;align-items:center"><button class="set-btn" id="s-guide" style="flex:1">${t('📖 功能向导 / 使用说明')}</button><button type="button" class="qmark" data-q="${esc(t('界面做了精简、很多功能被收了起来；忘记某个功能怎么用时，随时点这里重看分步引导。'))}">?</button></div>
+       <div class="grp"><div class="lbl">${t('下载 EPUB 版本')}</div><div class="seg" id="s-epubver"><button data-v="3" class="${v3sel ? 'active' : ''}">EPUB&nbsp;3</button><button data-v="2" class="${!v3sel ? 'active' : ''}">EPUB&nbsp;2</button></div><div class="set-hint">${t('默认生成更规范的 EPUB 3（现行标准）；个别老设备 / 老阅读器不兼容时再切回 EPUB 2。')}</div></div>
+       <section class="set-adv">
+         <button type="button" class="set-adv-h" id="s-adv-toggle" aria-expanded="${settings.foldAdv ? 'true' : 'false'}" aria-controls="s-adv-body"><span>${t('高级 / 实验性功能')}</span><span class="set-adv-caret" aria-hidden="true">▸</span></button>
+         <div class="set-adv-body" id="s-adv-body" role="region" aria-label="${esc(t('高级 / 实验性功能'))}"${settings.foldAdv ? '' : ' hidden'}>
+           <section class="set-sub">
+             <div class="set-sub-h">📚 <span>${t('发送到书库（Calibre）')}</span> <span class="set-tag">${t('实验性')}</span><button type="button" class="qmark" data-q="${esc(t('需自行搭建 calibre-bridge 并允许脚本连接该地址，自担风险。'))}">?</button></div>
+             <label class="grp toggle" style="margin:8px 0 0"><span class="lbl">${t('启用书库')}</span><input type="checkbox" id="s-lib" ${settings.libEnable ? 'checked' : ''}></label>
+             <input type="text" id="s-liburl" class="lib-in" value="${esc(settings.libUrl || '')}" placeholder="http://127.0.0.1:8788">
+             <input type="text" id="s-libtoken" class="lib-in" value="${esc(settings.libToken || '')}" placeholder="${esc(t('Token（可选，留空即不校验）'))}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
+             <button class="set-btn" id="s-libtest">${t('测试连接')}</button>
+             <div class="set-hint" id="libHint"></div>
+           </section>
+           <section class="set-sub">
+             <div class="set-sub-h">🤖 <span>${t('用 LLM 整理元数据')}</span> <span class="set-tag">${t('实验性')}</span><button type="button" class="qmark" data-q="${esc(t('API Key 明文存于本机浏览器；会把卷首文本发往第三方、可能产生费用，自担风险。'))}">?</button></div>
+             <label class="grp toggle" style="margin:8px 0 0"><span class="lbl">${t('启用 LLM 整理')}</span><input type="checkbox" id="s-llm" ${settings.llmEnable ? 'checked' : ''}></label>
+             <div class="seg" id="s-llmprov" style="margin:8px 0 0">${Object.entries(LLM_PRESETS).map(([k, p]) => `<button data-p="${k}" class="${(settings.llmProvider || 'openai') === k ? 'active' : ''}">${esc(t(p.label))}</button>`).join('')}</div>
+             <input type="text" id="s-llmbase" class="lib-in" value="${esc(settings.llmBase || '')}" placeholder="${esc(lp.base)}">
+             <input type="text" id="s-llmkey" class="lib-in" value="${esc(settings.llmKey || '')}" placeholder="${esc(t('API Key（仅存于本机浏览器）'))}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
+             <input type="text" id="s-llmmodel" class="lib-in" value="${esc(settings.llmModel || '')}" placeholder="${esc(lp.model)}">
+             <button class="set-btn" id="s-llmtest">${t('用当前书测试 / 重新整理')}</button>
+             <div class="set-hint">${t('若使用其它接口地址，需在脚本头部加一行 @connect 你的域名（或在 Tampermonkey 弹窗里允许）。')}</div>
+             <div class="set-hint" id="llmHint"></div>
+           </section>
          </div>
-         <div class="grp" style="border-top:1px solid color-mix(in srgb,var(--ir-muted) 16%,transparent);padding-top:12px"><div class="lbl">🤖 ${t('用 LLM 整理元数据')} <span class="set-tag">${t('实验性')}</span><span class="qmark" title="${esc(t('API Key 明文存于本机浏览器；会把卷首文本发往第三方、可能产生费用，自担风险。'))}">?</span></div>
-           <div class="grp toggle" style="margin:8px 0 0"><div class="lbl" style="margin:0">${t('启用 LLM 整理')}</div><input type="checkbox" id="s-llm" ${settings.llmEnable ? 'checked' : ''}></div>
-           <div class="seg" id="s-llmprov" style="margin:8px 0 0">${Object.entries(LLM_PRESETS).map(([k, p]) => `<button data-p="${k}" class="${(settings.llmProvider || 'openai') === k ? 'active' : ''}">${esc(t(p.label))}</button>`).join('')}</div>
-           <input type="text" id="s-llmbase" class="lib-in" value="${esc(settings.llmBase || '')}" placeholder="${esc(lp.base)}">
-           <input type="text" id="s-llmkey" class="lib-in" value="${esc(settings.llmKey || '')}" placeholder="${esc(t('API Key（仅存于本机浏览器）'))}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
-           <input type="text" id="s-llmmodel" class="lib-in" value="${esc(settings.llmModel || '')}" placeholder="${esc(lp.model)}">
-           <button class="set-btn" id="s-llmtest">${t('用当前书测试 / 重新整理')}</button>
-           <div class="set-hint">${t('若使用其它接口地址，需在脚本头部加一行 @connect 你的域名（或在 Tampermonkey 弹窗里允许）。')}</div>
-           <div class="set-hint" id="llmHint"></div>
-         </div>
-       </details>`;
+       </section>`;
     const sw = body.querySelector('#sw');
     const swatches = [['system', '跟随系统'], ['paper', '纸白'], ['sepia', '护眼'], ['dark', '夜间'], ['custom', '自定义']];
     sw.innerHTML = swatches.map(([k, label]) => {
@@ -1001,8 +1045,11 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
     body.querySelector('#s-outline').onchange = (e) => { settings.showOutline = e.target.checked; saveSettings(); openOutline(e.target.checked && !isMobile()); };
     body.querySelector('#s-minimap').onchange = (e) => { settings.minimap = e.target.checked; saveSettings(); buildMinimap(); };
     body.querySelector('#s-guide').onclick = () => { togglePanel(false); openGuide(0); };
-    // remember the Advanced section's open state so a re-render (e.g. picking an LLM provider) doesn't fold it
-    body.querySelector('#s-fold-adv').ontoggle = (e) => { settings.foldAdv = e.target.open; saveSettings(); };
+    // Advanced/experimental disclosure (accessible button + region; remembers its open state so a
+    // re-render — e.g. picking an LLM provider — doesn't fold it back up).
+    const advT = body.querySelector('#s-adv-toggle');
+    advT.onclick = () => { const open = advT.getAttribute('aria-expanded') !== 'true'; advT.setAttribute('aria-expanded', open ? 'true' : 'false'); body.querySelector('#s-adv-body').hidden = !open; settings.foldAdv = open; saveSettings(); };
+    bindQmarks(body);   // ? buttons → click to toggle an inline help note (no slow hover tooltips)
     body.querySelector('#s-lang').querySelectorAll('button').forEach((b) => (b.onclick = () => { settings.lang = b.dataset.l; saveSettings(); applyLang(); renderSettings(); }));
     body.querySelector('#s-lib').onchange = (e) => { settings.libEnable = e.target.checked; saveSettings(); };
     body.querySelector('#s-liburl').oninput = (e) => { settings.libUrl = e.target.value.trim(); saveSettings(); };
@@ -1209,34 +1256,53 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
     $('dl-lib').style.display = settings.libEnable ? '' : 'none';
     const isSeries = S.mode === 'series' && S.toc.length > 1;
     $('dlRange').style.display = isSeries ? '' : 'none';
-    $('dlgT').textContent = isSeries ? t('下载 / 发送（可选章节范围）') : t('下载 / 发送整本');
-    if (isSeries) {
-      // two plain number inputs (1-based chapter numbers); default = the whole book.
-      // values are clamped to [1, N] and ordered (from <= to) when you commit an edit.
-      const N = S.toc.length, a = $('dlFrom'), b = $('dlTo');
-      $('dlRngLbl').textContent = t('章节范围'); $('dlFromLbl').textContent = t('从'); $('dlToLbl').textContent = t('到');
-      a.min = b.min = '1'; a.max = b.max = String(N);
-      a.value = '1'; b.value = String(N);
-      const nm = (i) => ((S.labels && S.labels[i]) || (S.toc[i] && S.toc[i].title) || '').slice(0, 40);
-      const cl = (v) => Math.min(N, Math.max(1, v));
-      const rd = (el, dflt) => { const n = parseInt(el.value, 10); return Number.isFinite(n) ? n : dflt; };
-      const paint = () => {
-        const lo = cl(rd(a, 1)), hi = cl(rd(b, N));
-        $('dlRngCount').textContent = '· ' + Math.max(0, hi - lo + 1) + ' / ' + N;
-        $('dlFromName').textContent = nm(lo - 1); $('dlToName').textContent = nm(hi - 1);
+    $('dlg').querySelector('.dlg-card').classList.toggle('has-range', isSeries);
+    $('dlgT').textContent = isSeries ? t('选择章节范围') : t('下载 / 发送整本');
+    if (isSeries) buildDlRange();
+  }
+  // A list-based chapter range picker (hotel/flight calendar style): click a start chapter, then an
+  // end chapter; the span between them fills in. Default = the whole book. Re-using the outline's labels.
+  function buildDlRange() {
+    const N = S.toc.length, list = $('dlList');
+    dlFrom = 0; dlTo = N - 1; dlPhase = 'start';
+    $('dlRngLbl').textContent = t('章节范围');
+    $('dlRngAll').textContent = t('整本');
+    list.setAttribute('aria-label', t('章节范围'));
+    const nm = (i) => (S.labels && S.labels[i]) || (S.toc[i] && S.toc[i].title) || ('#' + (i + 1));
+    list.innerHTML = S.toc.map((c, i) => `<button class="dl-ch" role="option" aria-selected="false" data-i="${i}" title="${esc(nm(i))}"><span class="n">${i + 1}</span><span class="ttl">${esc(nm(i))}</span></button>`).join('');
+    const btns = [...list.querySelectorAll('.dl-ch')];
+    // While picking the end (phase 'end'), hovering chapter `preview` shows the tentative span; otherwise
+    // the committed [dlFrom..dlTo] is shown. Endpoints get .end1, the chapters between get .in.
+    // The selected span is also exposed to assistive tech via aria-selected so it isn't visual-only.
+    const paint = (preview) => {
+      const usePrev = (preview != null && dlPhase === 'end');
+      const lo = Math.min(dlFrom, usePrev ? preview : dlTo), hi = Math.max(dlFrom, usePrev ? preview : dlTo);
+      btns.forEach((b, i) => { const on = i >= lo && i <= hi; b.classList.toggle('end1', i === lo || i === hi); b.classList.toggle('in', i > lo && i < hi); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      $('dlRngCount').textContent = (hi - lo + 1) + ' / ' + N;
+      $('dlRngTip').textContent = dlPhase === 'end' ? t('再点一章设为结束') : t('点一章设为开始，再点一章设为结束');
+    };
+    btns.forEach((b) => {
+      b.onclick = () => {
+        const i = Number(b.dataset.i);
+        if (dlPhase === 'start') { dlFrom = i; dlTo = i; dlPhase = 'end'; }
+        else { dlTo = i; dlPhase = 'start'; }   // dlFrom is the anchor; paint() orders lo/hi so a backward pick still works
+        paint();
       };
-      a.oninput = paint; b.oninput = paint;
-      a.onchange = () => { let lo = cl(rd(a, 1)), hi = cl(rd(b, N)); if (lo > hi) lo = hi; a.value = String(lo); b.value = String(hi); paint(); };
-      b.onchange = () => { let lo = cl(rd(a, 1)), hi = cl(rd(b, N)); if (hi < lo) hi = lo; a.value = String(lo); b.value = String(hi); paint(); };
-      paint();
-    }
+      b.onmouseenter = () => { if (dlPhase === 'end') paint(Number(b.dataset.i)); };
+      b.onfocus = () => { if (dlPhase === 'end') paint(Number(b.dataset.i)); };   // keyboard users see the tentative span as they tab toward the end
+    });
+    list.onmouseleave = () => { if (dlPhase === 'end') paint(); };
+    list.onfocusout = (e) => { if (dlPhase === 'end' && !list.contains(e.relatedTarget)) paint(); };   // keyboard analogue of mouseleave: revert the tentative span when focus leaves the list (property-assign, like onmouseleave, so re-opens don't stack handlers)
+    $('dlRngAll').onclick = () => { dlFrom = 0; dlTo = N - 1; dlPhase = 'start'; paint(); btns[0] && btns[0].scrollIntoView({ block: 'nearest' }); };
+    paint();
+    const cur = btns[Math.min(N - 1, Math.max(0, S.idx | 0))]; cur && cur.scrollIntoView({ block: 'center' });   // anchor the list on the chapter being read (e.g. opening ch.700 of a 1000-ch series) instead of leaving it at ch.1
   }
   const getDlRange = () => {
     if (!(S.mode === 'series' && $('dlRange').style.display !== 'none')) return null;
-    const N = S.toc.length, cl = (v, d) => { const n = parseInt(v, 10); return Math.min(N, Math.max(1, Number.isFinite(n) ? n : d)); };
-    let from = cl($('dlFrom').value, 1), to = cl($('dlTo').value, N);
+    const N = S.toc.length, cl = (v) => Math.min(N - 1, Math.max(0, v | 0));
+    let from = cl(dlFrom), to = cl(dlTo);
     if (from > to) { const m = from; from = to; to = m; }
-    return { from: from - 1, to: to - 1 };   // 1-based UI -> 0-based inclusive index
+    return { from, to };   // 0-based inclusive index
   };
   function closeDlg() { if (!S.busy) $('dlg').classList.remove('show'); }
   async function doSendToLib() {
@@ -1422,7 +1488,7 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
     { t: { zh: '设置入口（⚙）', en: 'Settings (⚙)' }, b: { zh: '⚙ 就在 ☰ 旁边，点它打开设置。下面几步带你过一遍里面的选项。', en: '⚙ sits next to ☰ — click it to open settings. The next few steps walk through what’s inside.' }, hl: '#t-set', reveal: true },
     { t: { zh: '主题 / 外观', en: 'Theme & look' }, b: { zh: '选主题或底色，调字号、行距、页宽和字体；界面语言也在这里切换。', en: 'Pick a theme or background, adjust font, size, spacing and width; switch the UI language here too.' }, hl: '#sw', panel: true },
     { t: { zh: '阅读进度', en: 'Reading progress' }, b: { zh: '默认开启，会帮你回到上次读到的地方（按账号分开记）。换设备时用「导出 / 导入」搬过去。', en: 'On by default — it brings you back to where you left off (kept per account). Use Export / Import to move it between devices.' }, hl: '#s-resume', panel: true },
-    { t: { zh: '高级（实验性）', en: 'Advanced (experimental)' }, b: { zh: '收起的「高级」里有 EPUB 版本、发送到 Calibre 和用 LLM 整理元数据。这些会连接外部服务、可能产生费用，请自行斟酌。', en: 'The folded “Advanced” holds the EPUB version, Send-to-Calibre, and LLM metadata. These reach external services and may cost money — use at your own discretion.' }, hl: '.set-fold', panel: true },
+    { t: { zh: '高级 / 实验性功能', en: 'Advanced (experimental)' }, b: { zh: '点这条「高级 / 实验性功能」展开，里面有发送到 Calibre 和用 LLM 整理元数据。它们会连接外部服务、可能产生费用，请自行斟酌。', en: 'Expand “Advanced (experimental)” for Send-to-Calibre and LLM metadata. These reach external services and may cost money — use at your own discretion.' }, hl: '#s-adv-toggle', panel: true },
     { t: { zh: '退出', en: 'Done reading' }, b: { zh: '看完点右下角的「✕ 退出」离开；如果中途翻了章，网站会停在你最后读的那一章。', en: 'Click “✕ Exit” at the bottom-right when you’re done; if you changed chapters along the way, the site lands on your last one.' }, hl: '#close' },
   ];
   let guideIdx = 0;
@@ -1448,7 +1514,9 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
     $('guideNext').textContent = guideIdx === GUIDE.length - 1 ? t('完成 ✓') : t('下一步 ›');
     $('guideDots').innerHTML = GUIDE.map((_, i) => `<span class="${i === guideIdx ? 'on' : ''}"></span>`).join('');
     $('overlay').classList.toggle('guide-reveal', !!s.reveal);
-    $('guideSpot').style.display = 'none';
+    // NOTE: do NOT hide the spotlight here. The dim mask lives on #guideSpot's box-shadow; hiding it each
+    // step made the whole screen flash bright→dark ("blink"). Keep it visible and let CSS transition glide
+    // it to the next target (placeSpot only hides when a step genuinely has no on-screen target).
     // open exactly the panel this step needs (settings for panel steps, outline for tab steps), then place the
     // spotlight AFTER the slide-in/scroll settles so the focus box matches the element's real on-screen position.
     if (s.panel) { if (!$('setPanel').classList.contains('show')) { renderSettings(); togglePanel(true); } }
@@ -1509,8 +1577,10 @@ input[type=range] { width: 100%; accent-color: #6366f1; }
   window.addEventListener('keydown', (e) => {
     if (!$('overlay').classList.contains('open')) return;
     if (/^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) return;
-    if (e.key === 'Escape') { if ($('guide').classList.contains('show')) closeGuide(); else if (S.mode2 === 'split') exitMode(); else if (S.mode2 === 'bookmark') selectOutlineTab('toc'); else if ($('dlg').classList.contains('show')) closeDlg(); else if ($('setPanel').classList.contains('show')) togglePanel(false); else if (isMobile() && $('overlay').classList.contains('ol-on')) openOutline(false); else closeReader(); }
-    else if (e.key === 'ArrowLeft') goPrev(); else if (e.key === 'ArrowRight') goNext();
+    if (e.key === 'Escape') { if ($('guide').classList.contains('show')) closeGuide(); else if ($('dlg').classList.contains('show')) closeDlg(); else if (S.mode2 === 'split') exitMode(); else if (S.mode2 === 'bookmark') selectOutlineTab('toc'); else if ($('setPanel').classList.contains('show')) togglePanel(false); else if (isMobile() && $('overlay').classList.contains('ol-on')) openOutline(false); else closeReader(); }
+    else if (!$('guide').classList.contains('show') && !$('dlg').classList.contains('show')) {   // don't page the reader behind an open guide/dialog (they capture pointer events but keyboard bubbles to window)
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); } else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+    }
   });
 
   /* ============== per-card 📖 buttons on list pages =============== */
