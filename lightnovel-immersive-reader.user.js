@@ -1439,9 +1439,14 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   function scheduleSaveProg() {
     clearTimeout(progTimer);
     progTimer = setTimeout(() => {
-      if (S.flow) { const c = S.toc[S.idx]; if (c && c.aid) saveProg(c.aid, chapFrac()); return; }   // seamless: a coarse within-chapter offset, keyed on the ACTIVE chapter's aid
+      if (S.flow) {
+        const c = S.toc[S.idx];
+        if (c && c.aid && chapEl(S.idx)) saveProg(c.aid, chapFrac());
+        return;   // seamless: a coarse within-chapter offset, keyed on the ACTIVE chapter's aid
+      }
       const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0) saveProg(curBmAid(), sc.scrollTop / max);
     }, 700);
+  }
   }
   // seamless resume: restore the saved within-chapter offset for the chapter we opened at, re-pinning as images settle
   function restoreFlowProg(i) {
