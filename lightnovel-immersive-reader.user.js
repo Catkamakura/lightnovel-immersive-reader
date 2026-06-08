@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.18.0
+// @version      1.20.0
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
@@ -44,7 +44,9 @@
   const DEFAULTS = { theme: 'system', customColor: '#f3ead6', fontSize: 19, lineHeight: 1.9, width: 740, font: 'system', autoOpen: false, showOutline: true, minimap: false, lang: 'system',
     libEnable: false, libUrl: 'http://127.0.0.1:8788', libToken: '', resume: true,
     llmEnable: false, llmProvider: 'openai', llmBase: '', llmKey: '', llmModel: '', epubVer: 3,
-    foldAdv: false };
+    foldAdv: false, seamlessScroll: true };
+  const WIN_KEEP = 12;   // seamless web-novel: max chapters kept in the DOM at once (distant ones unload to spacers)
+  const FLOW_PAD = 1200; // px from an edge at which the next/prev chapter starts loading
 
   let settings = (() => { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}')); } catch { return Object.assign({}, DEFAULTS); } })();
   const saveSettings = () => localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
@@ -70,6 +72,7 @@
     '自定义底色（如 #AA4A44）': 'Custom background (e.g. #AA4A44)', '字号': 'Font size', '行距': 'Line height', '页宽': 'Page width', '字体': 'Font',
     '系统': 'System', '黑体': 'Sans', '宋体': 'Serif',
     '显示目录侧栏（电脑端）': 'Show outline sidebar (desktop)', '右侧缩略图 Minimap（电脑端）': 'Minimap (desktop)', '进入详情页自动沉浸': 'Auto-open reader on a detail page',
+    '网文连续滚动': 'Continuous scroll (web novels)', '像起点那样：滚到底自动接上下一章、向上滚动接上一章；远处章节会自动卸载以省内存。关掉则一章一页、用上一章 / 下一章翻页。': 'Qidian-style: reaching the bottom loads the next chapter and scrolling up loads the previous one; distant chapters unload to save memory. Turn off for one-chapter-per-page with Prev / Next.',
     '语言': 'Language', '阅读进度': 'Reading progress', '网文回到上次看的章节，单篇回到上次的位置': 'Web novels return to the last chapter; single articles to the last position',
     '导出进度': 'Export', '导入进度': 'Import', '进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。': 'Progress is stored locally per signed-in account; export then import to move it between devices (never mixed across accounts).',
     '📖 功能向导 / 使用说明': '📖 Feature guide', '界面做了精简、很多功能被收了起来；忘记某个功能怎么用时，随时点这里重看分步引导。': 'The UI is intentionally minimal and tucks features away — open this anytime for the step-by-step guide.',
@@ -97,8 +100,18 @@
     // toast prefixes (dynamic) + progress
     '已续读至 ': 'Resumed at ', '已为你续读至 ': 'Resumed at ', '已导入 ': 'Imported ', 'LLM 整理失败：': 'LLM failed: ',
     '正在准备…': 'Preparing…', '正在用 LLM 整理元数据…': 'Tidying metadata with the LLM…', '正在打包章节…': 'Collecting chapters…', '正在获取封面…': 'Fetching cover…', '正在打包 EPUB…': 'Packaging EPUB…', '正在生成 EPUB…': 'Building EPUB…', '正在发送到书库…': 'Sending to the library…', '完成 ✓': 'Done ✓',
+    // always-visible chapter meta / tail / outline notes / settings-close tooltip
+    '章节': 'chapters', '全书完': 'The End', '关闭设置': 'Close settings',
+    '书签模式：点击正文段落即可添加 / 移除（仅当前章节）。': 'Bookmark mode: tap any paragraph to add / remove (this chapter only).',
+    '书签模式：点击正文段落即可添加 / 移除；下方按所在章节分组。': 'Bookmark mode: tap any paragraph to add / remove; grouped by chapter below.',
+    '提示：当前在「目录」，再点一次「目录」即可调整分章。': 'Tip: you are on “Contents” — tap “Contents” again to adjust splits.',
+    '本篇为单段内容。再点一次上方「目录」即可进入分章调整、自行划分。': 'This is a single section. Tap “Contents” above again to split it yourself.',
+    '核对原文末尾（确认未删减）': 'Check the source ending (verify nothing was cut)', '段': 'blocks',
+    '原文最后 ': "Source's last ", ' 行（与上方正文结尾一致，未删减）：': ' lines (identical to the ending above, uncut):',
   };
   const t = (zh) => (curLang() === 'en' && EN[zh]) ? EN[zh] : zh;
+  // "第 N / N 章" (ZH) / "Ch. N / N" (EN); n = 1-based position, total = chapter count
+  const chMeta = (n, total) => curLang() === 'en' ? ('Ch. ' + n + ' / ' + total) : ('第 ' + n + ' / ' + total + ' 章');
   // apply the current language to the static chrome (built once); re-applied whenever the language changes
   function refreshChrome() {
     const set = (id, zh) => { const el = $(id); if (el) el.textContent = t(zh); };
@@ -400,6 +413,12 @@
 .content { max-width: var(--ir-width); margin: 0 auto; padding: 64px 24px 96px; font-size: var(--ir-fs); line-height: var(--ir-lh); }
 .content h1.t { font-size: 1.5em; font-weight: 800; text-align: center; margin: 0 0 12px; } .content .meta { text-align: center; color: var(--ir-muted); font-size: .72em; margin-bottom: 36px; }
 .body p { margin: 0 0 .9em; } .body img { max-width: 100% !important; height: auto !important; display: block; margin: 1.3em auto; border-radius: 8px; } .body a { color: #6366f1; word-break: break-all; } .body hr { border: none; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 35%, transparent); margin: 1.4em 0; } .body table { max-width: 100%; }
+/* seamless web-novel flow: stacked chapter sections with a clear divider; spacers stand in for unloaded chapters */
+.chap { border-top: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); }
+.chap:first-of-type { border-top: none; }
+.chap h1.t { font-size: 1.42em; font-weight: 800; text-align: center; margin: 1.5em 0 10px; line-height: 1.4; }
+.chap .meta { text-align: center; color: var(--ir-muted); font-size: .72em; margin-bottom: 30px; }
+.chap-spacer { width: 100%; }
 .foot { display: flex; gap: 12px; justify-content: space-between; margin-top: 50px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 22%, transparent); }
 .foot button { flex: 1; padding: 12px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; border: 1px solid color-mix(in srgb, var(--ir-muted) 30%, transparent); background: var(--ir-surface); color: var(--ir-text); } .foot button.primary { background: #6366f1; color: #fff; border-color: #6366f1; } .foot button:disabled { opacity: .35; cursor: not-allowed; }
 .rail { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 5; display: flex; flex-direction: column; gap: 2px; padding: 7px 5px; border-radius: 18px; background: color-mix(in srgb, var(--ir-surface) 90%, transparent); border: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); backdrop-filter: blur(10px); box-shadow: 0 8px 26px rgba(0,0,0,.16); }
@@ -563,6 +582,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
 .overlay.guide-reveal .cbtn.reveal { opacity: .95 !important; transform: none !important; }   /* reveal = make the hover button visible, NOT interactive (the guide blocks clicks) */
 .launch { position: fixed; right: 116px; bottom: 26px; z-index: 2147482000; display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border: none; cursor: pointer; border-radius: 999px; background: #4f46e5; color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.18); font-family: system-ui,sans-serif; transition: transform .15s, background .15s; } .launch:hover { transform: translateY(-2px); background: #4338ca; }
 @media (max-width: 820px) { .launch { right: 16px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 `;
 
   const host = document.createElement('div'); host.id = 'lkir-host'; document.documentElement.appendChild(host);
@@ -596,7 +616,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       </div>
       <div class="scrim" id="scrim"></div>
       <div class="panel right" id="setPanel"><h3>阅读设置 <button class="icon-btn x" id="setClose">✕</button></h3><div class="pbody" id="setBody"></div></div>
-      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlRngLbl">章节范围</span><span class="dl-rng-right"><span id="dlRngCount" aria-live="polite"></span><button class="dl-rng-all" id="dlRngAll">整本</button></span></div><div class="dl-nums"><label><span id="dlFromLbl">从</span><input type="number" id="dlFrom" min="1" value="1" inputmode="numeric" autocomplete="off"></label><span class="dl-num-sep">–</span><label><span id="dlToLbl">到</span><input type="number" id="dlTo" min="1" value="1" inputmode="numeric" autocomplete="off"></label></div><div class="dl-rng-tip" id="dlRngTip" aria-live="polite"></div><div class="dl-list" id="dlList" role="listbox" aria-label="章节范围"></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
+      <div class="dlg" id="dlg"><div class="dlg-card"><div class="t" id="dlgT">下载 / 发送整本</div><div class="m" id="dlgMsg">选择导出格式</div><div class="dl-range" id="dlRange" style="display:none"><div class="dl-rng-head"><span id="dlRngLbl">章节范围</span><span class="dl-rng-right"><span id="dlRngCount" aria-live="polite"></span><button class="dl-rng-all" id="dlRngAll">整本</button></span></div><div class="dl-nums"><label><span id="dlFromLbl">从</span><input type="number" id="dlFrom" min="1" value="1" inputmode="numeric" autocomplete="off"></label><span class="dl-num-sep">–</span><label><span id="dlToLbl">到</span><input type="number" id="dlTo" min="1" value="1" inputmode="numeric" autocomplete="off"></label></div><div class="dl-rng-tip" id="dlRngTip" aria-live="polite"></div><div class="dl-list" id="dlList" role="group" aria-label="章节范围"></div></div><div class="acts" id="dlgActs"><button class="lib" id="dl-lib" style="display:none">📚 发送到书库（Calibre）</button><button class="epub" id="dl-epub">📖 EPUB（封面+插图）</button><button class="txt" id="dl-txt">📄 TXT（纯文本）</button></div><button class="cancel" id="dlgClose">取消</button></div></div>
       <div class="guide" id="guide"><div class="guide-spot" id="guideSpot"></div><div class="guide-card"><button class="guide-skip" id="guideSkip">跳过</button><div class="guide-step" id="guideStep"></div><div class="guide-t" id="guideTitle"></div><div class="guide-b" id="guideBody"></div><div class="guide-acts"><button id="guidePrev">‹ 上一步</button><div class="guide-dots" id="guideDots"></div><button id="guideNext" class="primary">下一步 ›</button></div></div></div>
       <div class="qpop" id="qpop" role="tooltip"></div>
       <div class="toast" id="toast"></div>
@@ -617,7 +637,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     S = { aid, detail: null, raw: '', rawLen: 0, author: '', bookTitle: '', busy: false, mode: 'stream', mode2: 'read',
       blocks: [], bclean: [], bounds: [], catalog: [], sections: [], secLabels: [], cat: [], catLabels: [], manualSplit: false,
       cblocks: [], cbclean: [],
-      bookmarks: [], bmConfirm: null, outlineTab: 'toc', toc: [], idx: 0, volumes: [], volLabels: [], downloadable: false };
+      bookmarks: [], bmConfirm: null, outlineTab: 'toc', toc: [], idx: 0, volumes: [], volLabels: [], downloadable: false,
+      flow: false, win: { first: 0, last: 0 }, flowBusy: false };   // seamless web-novel: contiguous loaded-chapter window
   }
   resetState(null);
   const lightClean = (s) => (s || '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '').replace(/\son\w+="[^"]*"/gi, '');
@@ -691,7 +712,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
         : '<div class="ch-sep"></div>';
       html += `<section class="ch" id="ch-${si}">${sep}<div class="ch-inner">${inner}</div></section>`;
     });
-    html += `<div class="r-tail"><div class="r-end">— 全书完 · 共 ${S.sections.length} 段 —</div><button class="r-tail-btn" id="tailBtn">核对原文末尾（确认未删减）</button><div class="r-tail-box" id="tailBox" style="display:none"></div></div>`;
+    html += `<div class="r-tail"><div class="r-end">— ${t('全书完')} · ${S.sections.length} ${t('段')} —</div><button class="r-tail-btn" id="tailBtn">${t('核对原文末尾（确认未删减）')}</button><div class="r-tail-box" id="tailBox" style="display:none"></div></div>`;
     $('content').innerHTML = `<div class="body stream${inter ? ' interactive' : ''}${S.mode2 === 'split' ? ' splitting' : ''}${S.mode2 === 'bookmark' ? ' marking' : ''}">${html}</div>`;
     if (keep) $('scroll').scrollTop = y; else { $('scroll').scrollTop = 0; savedScroll = null; }
     $('progress').style.width = '0';
@@ -706,12 +727,12 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     const box = $('content').querySelector('#tailBox'); if (!box) return;
     if (box.style.display !== 'none') { box.style.display = 'none'; return; }
     const tail = S.blocks.map((b) => b.text).filter((t) => t).slice(-12);
-    box.innerHTML = '<div class="tail-h">原文最后 ' + tail.length + ' 行（与上方正文结尾一致，未删减）：</div>' + tail.map((t) => '<div class="tail-l">' + esc(t) + '</div>').join('');
+    box.innerHTML = '<div class="tail-h">' + esc(t('原文最后 ')) + tail.length + esc(t(' 行（与上方正文结尾一致，未删减）：')) + '</div>' + tail.map((l) => '<div class="tail-l">' + esc(l) + '</div>').join('');
     box.style.display = '';
   }
   function onBodyClick(e) {
     if (S.mode2 === 'split') { const x = e.target.closest('.sep-x'); if (x) { e.preventDefault(); removeBound(Number(x.dataset.bi)); return; } const blk = e.target.closest('.blk'); if (blk) { e.preventDefault(); addBound(Number(blk.dataset.bi)); } return; }
-    if (S.mode2 === 'bookmark') { const blk = e.target.closest('.blk'); if (blk) { e.preventDefault(); toggleBookmark(Number(blk.dataset.bi)); } }
+    if (S.mode2 === 'bookmark') { const blk = e.target.closest('.blk'); if (blk) { e.preventDefault(); if (S.flow) toggleBookmarkFlow(Number(blk.dataset.ci), Number(blk.dataset.bi)); else toggleBookmark(Number(blk.dataset.bi)); } }
   }
   function keepRender() { const y = $('scroll').scrollTop; renderStream(true); $('scroll').scrollTop = y; }
   function addBound(bi) { if (bi <= 0 || S.bounds.includes(bi)) return; S.bounds = [...S.bounds, bi].sort((a, b) => a - b); saveSplit(); keepRender(); renderOutline(); }
@@ -724,7 +745,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     else { S.bookmarks.push({ bi, label: ((blocks[bi] && blocks[bi].text) || '［图片］').slice(0, 30) }); S.bookmarks.sort((a, b) => a.bi - b.bi); flashToast('已添加书签'); }
     saveBM(); if (S.mode === 'series') renderSeriesBody(true); else keepRender(); renderOutline();
   }
-  function jumpToBlock(bi) { const el = $('content').querySelector('.blk[data-bi="' + bi + '"]'); if (el) pinScroll(() => secTop(el) - 40); }
+  function jumpToBlock(bi) { const sel = S.flow ? '.chap[data-ci="' + S.idx + '"] .blk[data-bi="' + bi + '"]' : '.blk[data-bi="' + bi + '"]'; const el = $('content').querySelector(sel); if (el) pinScroll(() => secTop(el) - 40); }
 
   /* ----- interactive modes ----- */
   function enterMode(m) {
@@ -733,10 +754,10 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     if (S.mode2 === m) { exitMode(); return; }
     S.mode2 = m; S.bmConfirm = null;
     S.outlineTab = m === 'split' ? 'toc' : 'bm';
-    if (S.mode === 'series') renderSeriesBody(true); else keepRender();
+    if (S.flow) flowRefresh(); else if (S.mode === 'series') renderSeriesBody(true); else keepRender();
     if (!isMobile()) openOutline(true); renderOutline();
   }
-  function exitMode() { if (S.mode2 === 'read') return; S.mode2 = 'read'; S.bmConfirm = null; suppressTocHover = true; if (S.mode === 'stream') keepRender(); else if (S.mode === 'series') renderSeriesBody(true); renderOutline(); }
+  function exitMode() { if (S.mode2 === 'read') return; S.mode2 = 'read'; S.bmConfirm = null; suppressTocHover = true; if (S.flow) flowRefresh(); else if (S.mode === 'stream') keepRender(); else if (S.mode === 'series') renderSeriesBody(true); renderOutline(); }
 
   /* ----- series (paged) ----- */
   async function ensureHtml(i) { const c = S.toc[i]; if (c.html == null) { try { c.html = await getContent(c.aid); } catch { c.html = '<p>本章无法获取（可能仅限 App）。</p>'; } } return c.html; }
@@ -758,7 +779,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     S.cblocks.forEach((blk, bi) => { const isBm = bm.has(bi); const mark = isBm ? `<span class="bm-mark" data-jump="${bi}">🔖</span>` : ''; inner += `<span class="blk${isBm ? ' bm' : ''}" data-bi="${bi}">${mark}${blkHtml(S.cblocks, S.cbclean, bi)}</span><br/>`; });
     const y = keep ? $('scroll').scrollTop : 0;
     $('content').innerHTML = '<h1 class="t">' + esc(S.labels[i] || c.title) + '</h1>' +
-      '<div class="meta">' + esc(S.author) + (S.toc.length > 1 ? ' · 第 ' + (i + 1) + ' / ' + S.toc.length + ' 章' : '') + '</div>' +
+      '<div class="meta">' + esc(S.author) + (S.toc.length > 1 ? ' · ' + esc(chMeta(i + 1, S.toc.length)) : '') + '</div>' +
       '<div class="body stream' + (inter ? ' interactive marking' : '') + '">' + inner + '</div>' +
       '<div class="foot"><button id="f-prev">' + t('‹ 上一章') + '</button><button id="f-cat">' + t('目录') + '</button><button id="f-next" class="primary">' + t('下一章 ›') + '</button></div>';
     if (keep) $('scroll').scrollTop = y; else $('scroll').scrollTop = 0;
@@ -769,6 +790,151 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     $('content').querySelector('.body').addEventListener('click', onBodyClick);
     $('overlay').classList.toggle('marking', inter); $('overlay').classList.remove('splitting');
     buildMinimap(); scheduleMinimap(700);
+  }
+
+  /* ----- series (SEAMLESS continuous flow, 起点-style): a window of chapter sections is stacked and the
+     scroll auto-loads the next/prev chapter near each edge; distant chapters unload to height-spacers so a
+     marathon read can't bloat the DOM. Per-chapter bookmarks via data-ci; the active chapter (whichever
+     heading sits at the viewport top) drives the outline highlight, the address bar, and history. ----- */
+  function chapBlocks(i) { const c = S.toc[i]; if (!c.blocks) { c.blocks = splitBlocks(c.html || ''); c.bclean = []; } return c.blocks; }
+  function chapBm(i) { const c = S.toc[i]; if (!c.bm) c.bm = loadBM(c.aid); return c.bm; }
+  function chapAvg() { let sum = 0, n = 0; for (const c of S.toc) if (c.h) { sum += c.h; n++; } return n ? sum / n : 1800; }
+  function estH(i) { return (S.toc[i] && S.toc[i].h) ? S.toc[i].h : chapAvg(); }
+  function chapInnerHtml(i) {
+    const blocks = chapBlocks(i), c = S.toc[i], bm = new Set(chapBm(i).map((b) => b.bi)), inter = S.mode2 === 'bookmark';
+    let inner = '';
+    blocks.forEach((blk, bi) => { const isBm = bm.has(bi); const mark = isBm ? `<span class="bm-mark" data-ci="${i}" data-jump="${bi}">🔖</span>` : ''; inner += `<span class="blk${isBm ? ' bm' : ''}" data-ci="${i}" data-bi="${bi}">${mark}${blkHtml(blocks, c.bclean, bi)}</span><br/>`; });
+    return '<h1 class="t">' + esc(S.labels[i] || c.title) + '</h1><div class="meta">' + esc(S.author) + ' · ' + esc(chMeta(i + 1, S.toc.length)) + '</div>'
+      + '<div class="body stream' + (inter ? ' interactive marking' : '') + '">' + inner + '</div>';
+  }
+  function chapSection(i) { const sec = document.createElement('section'); sec.className = 'ch chap'; sec.id = 'chap-' + i; sec.dataset.ci = i; sec.dataset.label = S.labels[i] || S.toc[i].title || ''; sec.innerHTML = chapInnerHtml(i); return sec; }
+  const chapEl = (i) => $('content').querySelector('.chap[data-ci="' + i + '"]');
+  function measure(i) { const sec = chapEl(i); if (sec) S.toc[i].h = sec.offsetHeight; }
+  function setSpacers() {
+    const top = $('flowTop'), bot = $('flowBot'); if (!top || !bot) return;
+    let th = 0; for (let i = 0; i < S.win.first; i++) th += estH(i);
+    let bh = 0; for (let i = S.win.last + 1; i < S.toc.length; i++) bh += estH(i);
+    top.style.height = Math.round(th) + 'px'; bot.style.height = Math.round(bh) + 'px';
+  }
+  const chapTop = (i) => { const sec = chapEl(i); return sec ? secTop(sec) : 0; };
+  async function renderFlow(start) {
+    S.flow = true; S.idx = start; S.win = { first: start, last: start };
+    S.mode2 = S.outlineTab === 'bm' ? 'bookmark' : 'read';
+    $('content').innerHTML = '<div class="loading">' + t('加载中…') + '</div>';
+    await ensureHtml(start); if (S.aid == null || S.mode !== 'series' || S.idx !== start) return;
+    S.bookmarks = chapBm(start);
+    const wrap = document.createElement('div'); wrap.className = 'flow'; wrap.id = 'flow';
+    const top = document.createElement('div'); top.className = 'chap-spacer'; top.id = 'flowTop';
+    const bot = document.createElement('div'); bot.className = 'chap-spacer'; bot.id = 'flowBot';
+    wrap.appendChild(top); wrap.appendChild(chapSection(start)); wrap.appendChild(bot);
+    $('content').innerHTML = ''; $('content').appendChild(wrap);
+    wrap.addEventListener('click', onBodyClick);
+    measure(start); setSpacers(); flowTail();   // show the 全书完 marker when opened at / jumped to the final chapter (or a 1-chapter series)
+    $('scroll').scrollTop = start <= 0 ? 0 : Math.max(0, chapTop(start) - 4); $('progress').style.width = '0';
+    addHistory(S.toc[start].aid); if (pageAid != null) { try { history.replaceState(history.state, '', '/detail/' + S.toc[start].aid); } catch { /* */ } }
+    $('overlay').classList.toggle('marking', S.mode2 === 'bookmark'); $('overlay').classList.remove('splitting');
+    updateChrome(); buildMinimap(); scheduleMinimap(700);
+    restoreFlowProg(start);   // restore within-chapter scroll position for the resumed chapter
+  }
+  async function flowAppend() {
+    if (S.flowBusy || !S.flow || S.win.last >= S.toc.length - 1) return;
+    const i = S.win.last + 1; S.flowBusy = true;
+    try { await ensureHtml(i); } finally { S.flowBusy = false; }
+    if (!S.flow || S.win.last !== i - 1) return;            // window moved under us (far jump / re-render)
+    $('flowBot').before(chapSection(i)); S.win.last = i; measure(i);
+    if (S.win.last - S.win.first + 1 > WIN_KEEP) { flowUnload('top'); flowReresolveActive(); }   // measured height → spacer, so no scroll jump
+    setSpacers(); flowTail(); scheduleMinimap(280);
+  }
+  async function flowPrepend() {
+    if (S.flowBusy || !S.flow || S.win.first <= 0) return;
+    const i = S.win.first - 1; S.flowBusy = true;
+    try { await ensureHtml(i); } finally { S.flowBusy = false; }
+    if (!S.flow || S.win.first !== i + 1) return;
+    const sc = $('scroll'), before = sc.scrollTop, est = estH(i);
+    const anchor = chapEl(S.win.first) || $('flowBot');   // the section just below the one we insert — its top stays pinned
+    $('flowTop').after(chapSection(i)); S.win.first = i; measure(i);
+    setSpacers();
+    sc.scrollTop = before + ((S.toc[i].h || est) - est);   // top spacer shrank by `est`; the real section is taller/shorter → keep the viewport fixed
+    if (S.win.last - S.win.first + 1 > WIN_KEEP) { flowUnload('bot'); flowReresolveActive(); }
+    setSpacers(); flowTail();
+    // The freshly-inserted previous chapter measured BEFORE its loading="lazy" images had height. As they
+    // decode the section grows ABOVE the viewport and yanks the page down — re-pin to the anchor below it
+    // (which must stay put), then re-measure so S.toc[i].h is the true post-image height.
+    flowPinAfterImages(i, anchor);
+    scheduleMinimap(280);
+  }
+  // Keep `anchor`'s scroll-position fixed as the lazy images inside section `i` (above it) load in.
+  function flowPinAfterImages(i, anchor) {
+    if (!anchor || !anchor.isConnected) return;
+    const sc = $('scroll');
+    let prevTop = secTop(anchor);
+    const repin = () => {
+      if (!S.flow || !anchor.isConnected) return;
+      const now = secTop(anchor);
+      const delta = now - prevTop;
+      if (delta) { sc.scrollTop = Math.max(0, sc.scrollTop + delta); prevTop = secTop(anchor); }
+      if (chapEl(i)) { measure(i); setSpacers(); }
+    };
+    requestAnimationFrame(repin);
+    const sec = chapEl(i); if (!sec) return;
+    sec.querySelectorAll('img').forEach((img) => { if (!img.complete) img.addEventListener('load', repin, { once: true }); });
+  }
+  function flowUnload(side) {
+    const i = side === 'top' ? S.win.first : S.win.last;
+    measure(i); const sec = chapEl(i); if (sec) sec.remove();
+    if (side === 'top') S.win.first = i + 1; else S.win.last = i - 1;
+  }
+  // an edge unload can drop the section S.idx points at (e.g. lingering near one edge while the other
+  // auto-loads). Re-resolve immediately so the outline highlight / chip / bookmark target never point at
+  // a removed section until the next scroll tick.
+  function flowReresolveActive() { if (S.idx < S.win.first || S.idx > S.win.last) flowSetActive(flowActiveFromScroll()); }
+  // a "全书完" marker once the final chapter is in the window (and the bottom spacer is gone)
+  function flowTail() {
+    const have = $('content').querySelector('#flowTail');
+    if (S.win.last >= S.toc.length - 1) { if (!have) { const d = document.createElement('div'); d.id = 'flowTail'; d.className = 'r-tail'; d.innerHTML = '<div class="r-end">— ' + esc(t('全书完')) + ' · ' + S.toc.length + ' ' + esc(t('章节')) + ' —</div>'; $('flowBot').before(d); } }
+    else if (have) have.remove();
+  }
+  // whichever loaded section's heading sits at/above the viewport top = the active chapter
+  function flowActiveFromScroll() {
+    const sc = $('scroll'); const probe = sc.scrollTop + 90; let act = S.win.first;
+    for (let i = S.win.first; i <= S.win.last; i++) { const sec = chapEl(i); if (sec && secTop(sec) <= probe) act = i; }
+    return act;
+  }
+  function flowOnScroll() {
+    if (!$('flowTop') || !$('flowBot')) return;
+    const sc = $('scroll');
+    if (sc.scrollTop < FLOW_PAD) flowPrepend();
+    if (sc.scrollTop + sc.clientHeight > sc.scrollHeight - FLOW_PAD) flowAppend();
+    const act = flowActiveFromScroll();
+    if (act !== S.idx) flowSetActive(act);
+  }
+  function flowSetActive(i) {
+    S.idx = i; S.bookmarks = chapBm(i); updateCurrent();
+    $('r-prev').disabled = i <= 0; $('r-next').disabled = i >= S.toc.length - 1;
+    if (S.outlineTab === 'bm') renderOutline();   // the 书签 list follows the active chapter
+    clearTimeout(S._flowHistT); S._flowHistT = setTimeout(() => { if (S.flow && S.idx === i && S.toc[i]) { addHistory(S.toc[i].aid); if (pageAid != null) { try { history.replaceState(history.state, '', '/detail/' + S.toc[i].aid); } catch { /* */ } } } }, 600);
+  }
+  function flowGoto(i) {
+    if (i < 0 || i >= S.toc.length) return;
+    if (i >= S.win.first && i <= S.win.last && chapEl(i)) { const sec = chapEl(i); pinScroll(() => secTop(sec) - 4); flowSetActive(i); return; }
+    renderFlow(i);   // far jump → rebuild the window around i
+  }
+  function toggleBookmarkFlow(ci, bi) {
+    const blocks = chapBlocks(ci), list = chapBm(ci);
+    const k = list.findIndex((b) => b.bi === bi);
+    if (k >= 0) { list.splice(k, 1); flashToast('已移除书签'); }
+    else { list.push({ bi, label: ((blocks[bi] && blocks[bi].text) || '［图片］').slice(0, 30) }); list.sort((a, b) => a.bi - b.bi); flashToast('已添加书签'); }
+    try { localStorage.setItem(BM_KEY(S.toc[ci].aid), JSON.stringify(list)); } catch { /* */ }
+    const sec = chapEl(ci); if (sec) { const y = $('scroll').scrollTop; sec.innerHTML = chapInnerHtml(ci); $('scroll').scrollTop = y; measure(ci); setSpacers(); }
+    if (ci === S.idx) S.bookmarks = list;
+    renderOutline(); scheduleMinimap(120);
+  }
+  // re-render the loaded chapter bodies in place (e.g. toggling bookmark mode) without rebuilding the window
+  function flowRefresh() {
+    const y = $('scroll').scrollTop;
+    for (let i = S.win.first; i <= S.win.last; i++) { const sec = chapEl(i); if (sec) sec.innerHTML = chapInnerHtml(i); }
+    $('scroll').scrollTop = y; $('overlay').classList.toggle('marking', S.mode2 === 'bookmark'); $('overlay').classList.remove('splitting');
+    scheduleMinimap(120);
   }
 
   /* ----- navigation ----- */
@@ -783,8 +949,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     [60, 180, 360, 650].forEach((d) => setTimeout(() => { if (Math.abs(el.scrollTop - last) <= 2) last = pin(); }, d));
   }
   function scrollToSec(i) { const s = $('content').querySelector('#ch-' + i); if (!s) return; pinScroll(() => secTop(s) - 10); }
-  function goPrev() { if (S.mode === 'series') { if (S.idx > 0) renderChapter(S.idx - 1); return; } const c = streamCur(); const s = $('content').querySelector('#ch-' + c); const atTop = s && secTop(s) >= $('scroll').scrollTop - 16; scrollToSec(atTop ? Math.max(0, c - 1) : c); }
-  function goNext() { if (S.mode === 'series') { if (S.idx < S.toc.length - 1) renderChapter(S.idx + 1); return; } const c = streamCur(); if (c < S.sections.length - 1) scrollToSec(c + 1); }
+  function goPrev() { if (S.flow) { flowGoto(S.idx - 1); return; } if (S.mode === 'series') { if (S.idx > 0) renderChapter(S.idx - 1); return; } const c = streamCur(); const s = $('content').querySelector('#ch-' + c); const atTop = s && secTop(s) >= $('scroll').scrollTop - 16; scrollToSec(atTop ? Math.max(0, c - 1) : c); }
+  function goNext() { if (S.flow) { flowGoto(S.idx + 1); return; } if (S.mode === 'series') { if (S.idx < S.toc.length - 1) renderChapter(S.idx + 1); return; } const c = streamCur(); if (c < S.sections.length - 1) scrollToSec(c + 1); }
 
   function updateChrome() {
     if (S.mode === 'series') { $('r-prev').disabled = S.idx <= 0; $('r-next').disabled = S.idx >= S.toc.length - 1; } else { $('r-prev').disabled = false; $('r-next').disabled = false; }
@@ -834,8 +1000,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
         } else b.onclick = () => selectOutlineTab(b.dataset.t);
       });
       $('outlineNote').textContent =
-        S.outlineTab === 'bm' ? (S.mode === 'series' ? '书签模式：点击正文段落即可添加 / 移除（仅当前章节）。' : '书签模式：点击正文段落即可添加 / 移除；下方按所在章节分组。')
-        : (S.outlineTab === 'toc' && canSplit && S.cat.length > 1 ? '提示：当前在「目录」，再点一次「目录」即可调整分章。' : '');
+        S.outlineTab === 'bm' ? (S.mode === 'series' ? t('书签模式：点击正文段落即可添加 / 移除（仅当前章节）。') : t('书签模式：点击正文段落即可添加 / 移除；下方按所在章节分组。'))
+        : (S.outlineTab === 'toc' && canSplit && S.cat.length > 1 ? t('提示：当前在「目录」，再点一次「目录」即可调整分章。') : '');
     }
     const list = $('outlineList');
     if (S.outlineTab === 'vol') {
@@ -850,10 +1016,10 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       if (list.dataset.sig !== sig || !list.querySelector('.cat-item[data-i]')) {
         list.dataset.sig = sig;
         list.innerHTML = S.toc.map((c, i) => `<button class="cat-item ${i === S.idx ? 'active' : ''}" data-i="${i}" title="${esc(c.title)}"><span class="n">${i + 1}</span><span>${esc(S.labels[i] || c.title)}</span></button>`).join('');
-        list.querySelectorAll('.cat-item').forEach((b) => (b.onclick = () => { if (isMobile()) openOutline(false); renderChapter(Number(b.dataset.i)); }));
+        list.querySelectorAll('.cat-item').forEach((b) => (b.onclick = () => { if (isMobile()) openOutline(false); if (S.flow) flowGoto(Number(b.dataset.i)); else renderChapter(Number(b.dataset.i)); }));
       }
     } else if (S.cat.length <= 1) {
-      list.innerHTML = '<div class="cat-note">本篇为单段内容。再点一次上方「目录」即可进入分章调整、自行划分。</div>';
+      list.innerHTML = '<div class="cat-note">' + t('本篇为单段内容。再点一次上方「目录」即可进入分章调整、自行划分。') + '</div>';
     } else {
       const cur = streamCur();
       list.innerHTML = S.cat.map((c, i) => `<button class="cat-item ${c.empty ? 'empty' : ''} ${c.sec === cur ? 'active' : ''}" data-sec="${c.sec == null ? '' : c.sec}" title="${esc(c.title)}"><span class="n">${i + 1}</span><span>${esc(S.catLabels[i] || c.title)}</span>${c.empty ? '<span class="cat-tag">' + t('未完成') + '</span>' : ''}</button>`).join('');
@@ -875,7 +1041,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       let h = `<div class="bm-grp"><div class="cat-item bm-grp-h" style="cursor:default"><span class="n">▎</span><span>${esc(t)}</span></div>`;
       (groups.get(0) || []).sort((a, b) => a.bi - b.bi).forEach((b) => { const cf = S.bmConfirm === b.bi; h += `<button class="cat-item bm-item" data-jump="${b.bi}" title="${esc(b.label)}"><span class="n">🔖</span><span>${esc(b.label)}</span><span class="bm-del${cf ? ' confirm' : ''}" data-del="${b.bi}">${cf ? '确认删除' : '✕'}</span></button>`; });
       list.innerHTML = h + '</div>';
-      list.querySelectorAll('.bm-item').forEach((b) => (b.onclick = (e) => { const del = e.target.closest('.bm-del'); if (del) { e.stopPropagation(); const bi = Number(del.dataset.del); if (S.bmConfirm === bi) { S.bmConfirm = null; toggleBookmark(bi); } else { S.bmConfirm = bi; renderOutline(); clearTimeout(S._bmT); S._bmT = setTimeout(() => { if (S.bmConfirm === bi) { S.bmConfirm = null; renderOutline(); } }, 2800); } return; } S.bmConfirm = null; if (isMobile()) openOutline(false); jumpToBlock(Number(b.dataset.jump)); }));
+      list.querySelectorAll('.bm-item').forEach((b) => (b.onclick = (e) => { const del = e.target.closest('.bm-del'); if (del) { e.stopPropagation(); const bi = Number(del.dataset.del); if (S.bmConfirm === bi) { S.bmConfirm = null; if (S.flow) toggleBookmarkFlow(S.idx, bi); else toggleBookmark(bi); } else { S.bmConfirm = bi; renderOutline(); clearTimeout(S._bmT); S._bmT = setTimeout(() => { if (S.bmConfirm === bi) { S.bmConfirm = null; renderOutline(); } }, 2800); } return; } S.bmConfirm = null; if (isMobile()) openOutline(false); jumpToBlock(Number(b.dataset.jump)); }));
       return;
     }
     let html = '';
@@ -901,10 +1067,20 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       S.bmConfirm = null; if (isMobile()) openOutline(false); jumpToBlock(Number(b.dataset.jump));
     }));
   }
+  // coarse 0..1 reading fraction WITHIN the active chapter (series mode), for the book-wide % estimate
+  function chapFrac() {
+    const sc = $('scroll'); if (!sc) return 0;
+    if (S.flow) { const sec = chapEl(S.idx); if (!sec) return 0; const h = sec.offsetHeight || 1; const d = sc.scrollTop - chapTop(S.idx); return Math.max(0, Math.min(1, d / h)); }
+    const max = sc.scrollHeight - sc.clientHeight; return max > 0 ? Math.max(0, Math.min(1, sc.scrollTop / max)) : 0;
+  }
   function updateCurrent() {
     const list = $('outlineList');
     if (S.mode === 'series') {
-      $('curChip').textContent = (S.labels && S.labels[S.idx]) || S.bookTitle || '';
+      const N = S.toc.length, name = (S.labels && S.labels[S.idx]) || S.bookTitle || '';
+      // "<chapter> · Ch i / N · ~B%" — a coarse book-wide position (not the loaded-window bar)
+      let readout = '';
+      if (N > 1) { const bookPct = Math.round(((S.idx + chapFrac()) / N) * 100); readout = ' · ' + chMeta(S.idx + 1, N) + ' · ~' + bookPct + '%'; }
+      $('curChip').textContent = name + readout;
       if (list) {
         let act = null;
         list.querySelectorAll('.cat-item').forEach((it) => { const on = it.dataset.i === String(S.idx); it.classList.toggle('active', on); if (on) act = it; });
@@ -960,7 +1136,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
           const li = lr != null ? S.toc.findIndex((t) => t.aid === lr) : -1;
           if (li > 0) { start = li; resumed = true; }
         }
-        S.idx = start; renderChapter(S.idx);
+        S.idx = start; if (settings.seamlessScroll) renderFlow(start); else renderChapter(start);
         if (resumed) flashToast(t('已续读至 ') + (S.labels[S.idx] || ('第' + (S.idx + 1) + '章')));
       } else { S.volumes = series; S.volLabels = chapterLabels(series.map((s) => s.title)); updateChrome(); }
     } else { updateChrome(); }
@@ -1008,6 +1184,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
        <div class="grp"><div class="lbl">${t('字体')}</div><div class="seg" id="s-font"><button data-f="system" class="${settings.font === 'system' ? 'active' : ''}">${t('系统')}</button><button data-f="sans" class="${settings.font === 'sans' ? 'active' : ''}">${t('黑体')}</button><button data-f="serif" class="${settings.font === 'serif' ? 'active' : ''}">${t('宋体')}</button></div></div>
        <label class="grp toggle"><span class="lbl">${t('显示目录侧栏（电脑端）')}</span><input type="checkbox" id="s-outline" ${settings.showOutline ? 'checked' : ''}></label>
        <label class="grp toggle"><span class="lbl">${t('右侧缩略图 Minimap（电脑端）')}</span><input type="checkbox" id="s-minimap" ${settings.minimap ? 'checked' : ''}></label>
+       <label class="grp toggle"><span class="lbl">${t('网文连续滚动')}</span><button type="button" class="qmark" data-q="${esc(t('像起点那样：滚到底自动接上下一章、向上滚动接上一章；远处章节会自动卸载以省内存。关掉则一章一页、用上一章 / 下一章翻页。'))}">?</button><input type="checkbox" id="s-seamless" ${settings.seamlessScroll ? 'checked' : ''}></label>
        <label class="grp toggle"><span class="lbl">${t('进入详情页自动沉浸')}</span><input type="checkbox" id="s-auto" ${settings.autoOpen ? 'checked' : ''}></label>
        <label class="grp toggle"><span class="lbl">${t('阅读进度')}</span><button type="button" class="qmark" data-q="${esc(t('网文回到上次看的章节，单篇回到上次的位置'))}">?</button><input type="checkbox" id="s-resume" ${settings.resume ? 'checked' : ''}></label>
        <div class="grp" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="set-btn" id="s-progexp" style="flex:1">⤓ ${t('导出进度')}</button><button class="set-btn" id="s-progimp" style="flex:1">⤒ ${t('导入进度')}</button><button type="button" class="qmark" data-q="${esc(t('进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。'))}">?</button><input type="file" id="s-progfile" accept="application/json,.json" style="display:none"></div>
@@ -1059,6 +1236,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     body.querySelector('#s-progfile').onchange = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => importProg(String(rd.result || '')); rd.readAsText(f); e.target.value = ''; };
     body.querySelector('#s-outline').onchange = (e) => { settings.showOutline = e.target.checked; saveSettings(); openOutline(e.target.checked && !isMobile()); };
     body.querySelector('#s-minimap').onchange = (e) => { settings.minimap = e.target.checked; saveSettings(); buildMinimap(); };
+    body.querySelector('#s-seamless').onchange = (e) => { settings.seamlessScroll = e.target.checked; saveSettings(); if (S.mode === 'series') { const i = S.idx; if (e.target.checked) renderFlow(i); else { S.flow = false; renderChapter(i); } } };
     body.querySelector('#s-guide').onclick = () => { togglePanel(false); openGuide(0); };
     // Advanced/experimental disclosure (accessible button + region; remembers its open state so a
     // re-render — e.g. picking an LLM provider — doesn't fold it back up).
@@ -1258,7 +1436,28 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     });
   }
   let progTimer = 0;
-  function scheduleSaveProg() { clearTimeout(progTimer); progTimer = setTimeout(() => { const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0) saveProg(curBmAid(), sc.scrollTop / max); }, 700); }
+  function scheduleSaveProg() {
+    clearTimeout(progTimer);
+    progTimer = setTimeout(() => {
+      if (S.flow) {
+        const c = S.toc[S.idx];
+        if (c && c.aid && chapEl(S.idx)) saveProg(c.aid, chapFrac());
+        return;   // seamless: a coarse within-chapter offset, keyed on the ACTIVE chapter's aid
+      }
+      const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0) saveProg(curBmAid(), sc.scrollTop / max);
+    }, 700);
+  }
+  }
+  // seamless resume: restore the saved within-chapter offset for the chapter we opened at, re-pinning as images settle
+  function restoreFlowProg(i) {
+    if (!settings.resume || !S.flow) return;
+    const c = S.toc[i]; if (!c || !c.aid) return;
+    const pct = getProg(c.aid); if (pct <= 0.03) return;
+    requestAnimationFrame(() => {
+      if (!S.flow || S.idx !== i || !chapEl(i)) return;
+      pinScroll(() => { const sec = chapEl(i); return sec ? chapTop(i) + pct * (sec.offsetHeight || 0) : 0; });   // re-pin as lazy images grow the section
+    });
+  }
   // scan a few pages of LK history (recency-sorted) and return the most-recently-read aid in this series
   async function lastReadAid(aidSet) {
     try { for (let p = 1; p <= 4; p++) { const data = await apiCall('/api/history/get-history', { page: p }); const list = (data && data.list) || []; if (!list.length) break; for (const it of list) if (aidSet.has(it.aid)) return it.aid; } } catch { /* */ }
@@ -1286,16 +1485,16 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     $('dlFromLbl').textContent = t('从'); $('dlToLbl').textContent = t('到');
     const inA = $('dlFrom'), inB = $('dlTo'); inA.min = inB.min = '1'; inA.max = inB.max = String(N);
     const nm = (i) => (S.labels && S.labels[i]) || (S.toc[i] && S.toc[i].title) || ('#' + (i + 1));
-    list.innerHTML = S.toc.map((c, i) => `<button class="dl-ch" role="option" aria-selected="false" data-i="${i}" title="${esc(nm(i))}"><span class="n">${i + 1}</span><span class="ttl">${esc(nm(i))}</span></button>`).join('');
+    list.innerHTML = S.toc.map((c, i) => `<button class="dl-ch" type="button" aria-pressed="false" data-i="${i}" title="${esc(nm(i))}"><span class="n">${i + 1}</span><span class="ttl">${esc(nm(i))}</span></button>`).join('');
     const btns = [...list.querySelectorAll('.dl-ch')];
     // Two ways to pick, kept in sync: click a start chapter then an end chapter in the list (hotel/flight
     // calendar style), OR just type the numbers. While picking the end (phase 'end'), hovering chapter
     // `preview` shows the tentative span; otherwise the committed [dlFrom..dlTo] shows. Endpoints get
-    // .end1 + the chapters between get .in; the span is mirrored to aria-selected and the number inputs.
+    // .end1 + the chapters between get .in; the span is mirrored to aria-pressed and the number inputs.
     const paint = (preview) => {
       const usePrev = (preview != null && dlPhase === 'end');
       const lo = Math.min(dlFrom, usePrev ? preview : dlTo), hi = Math.max(dlFrom, usePrev ? preview : dlTo);
-      btns.forEach((el, i) => { const on = i >= lo && i <= hi; el.classList.toggle('end1', i === lo || i === hi); el.classList.toggle('in', i > lo && i < hi); el.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      btns.forEach((el, i) => { const on = i >= lo && i <= hi; el.classList.toggle('end1', i === lo || i === hi); el.classList.toggle('in', i > lo && i < hi); el.setAttribute('aria-pressed', on ? 'true' : 'false'); });
       $('dlRngCount').textContent = (hi - lo + 1) + ' / ' + N;
       $('dlRngTip').textContent = dlPhase === 'end' ? t('再点一章设为结束') : t('点一章设为开始，再点一章设为结束');
       const clo = Math.min(dlFrom, dlTo) + 1, chi = Math.max(dlFrom, dlTo) + 1;   // mirror the committed span to the inputs (don't clobber the one being typed in)
@@ -1386,7 +1585,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   function openReader(aid) { pageAid = currentAid(); applyTheme(); $('overlay').classList.add('open'); document.documentElement.style.overflow = 'hidden'; openOutline(settings.showOutline && !isMobile()); openArticle(aid); maybeAutoGuide(); }
   function closeReader() {
     const landing = S.aid;
-    try { const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0 && S.aid) saveProg(curBmAid(), sc.scrollTop / max); } catch { /* */ }
+    try { if (S.flow) { const c = S.toc[S.idx]; if (c && c.aid) saveProg(c.aid, chapFrac()); } else { const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0 && S.aid) saveProg(curBmAid(), sc.scrollTop / max); } } catch { /* */ }
     $('overlay').classList.remove('open', 'splitting', 'marking', 'mm-on'); $('minimap').style.display = 'none'; document.documentElement.style.overflow = ''; exitMode(); togglePanel(false); openOutline(false); if ($('guide').classList.contains('show')) closeGuide();
     // if we were launched from a detail page and the reader walked to a different book/volume,
     // navigate the underlying site to it now (on exit) so the page behind matches what was read.
@@ -1397,9 +1596,9 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       setTimeout(() => { suppressOpen = false; }, 1800);
     }
   }
-  function togglePanel(show) { hideQPop(); $('setPanel').classList.toggle('show', show); $('overlay').classList.toggle('panel-open', show); $('t-set').textContent = show ? '✕' : '⚙'; $('t-set').title = show ? '关闭设置' : '阅读设置'; updateScrim(); }
+  function togglePanel(show) { hideQPop(); $('setPanel').classList.toggle('show', show); $('overlay').classList.toggle('panel-open', show); $('t-set').textContent = show ? '✕' : '⚙'; $('t-set').title = show ? t('关闭设置') : t('阅读设置'); updateScrim(); }
   function updateTopBtn() { const el = $('scroll'); const atTop = el.scrollTop <= 60; const ic = $('r-top').querySelector('.ic'); const lb = $('r-top').querySelector('.lb'); if (atTop && savedScroll != null) { ic.textContent = '↓'; lb.textContent = t('返回'); } else { ic.textContent = '↑'; lb.textContent = t('顶部'); } }
-  function toggleTop() { const el = $('scroll'); if (el.scrollTop > 60) { savedScroll = el.scrollTop; el.scrollTo({ top: 0, behavior: 'smooth' }); } else if (savedScroll != null) { el.scrollTo({ top: savedScroll, behavior: 'smooth' }); savedScroll = null; } setTimeout(updateTopBtn, 50); }
+  function toggleTop() { const el = $('scroll'); const behavior = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth'; if (el.scrollTop > 60) { savedScroll = el.scrollTop; el.scrollTo({ top: 0, behavior }); } else if (savedScroll != null) { el.scrollTo({ top: savedScroll, behavior }); savedScroll = null; } setTimeout(updateTopBtn, 50); }
 
   /* ===================== minimap (Sublime-style: offscreen full map drawn once, visible slice blitted on scroll) ======================= */
   // Enriched: real image thumbnails + faint per-chapter bands + chapter divider lines + amber bookmark ticks.
@@ -1420,7 +1619,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   }
   function buildMinimap() {
     const mm = $('minimap'), ov = $('overlay'), content = $('content');
-    const body = content && content.querySelector('.body');
+    const body = content && (S.flow ? content.querySelector('#flow') : content.querySelector('.body'));
     if (!minimapOn() || !body) { mm.style.display = 'none'; ov.classList.remove('mm-on'); mm._full = null; return; }
     mm.style.display = ''; ov.classList.add('mm-on');
     const sc = $('scroll');
@@ -1464,7 +1663,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       if (i > 0) { fx.fillStyle = '#6366f1'; fx.fillRect(0, Math.round(top) - 1, W, 2.6); }   // thicker full-width divider
       if (top - lastLbl >= 16) {
         lastLbl = top;
-        const txt = chapTab(S.secLabels[i] || (S.sections[i] && S.sections[i].title) || ('#' + (i + 1)));
+        const txt = chapTab(sec.dataset.label || S.secLabels[i] || (S.sections[i] && S.sections[i].title) || ('#' + (i + 1)));
         if (txt) { const tw = Math.min(W * 0.66, Math.ceil(fx.measureText(txt).width) + 8); fx.fillStyle = '#4f46e5'; fx.fillRect(0, top, tw, 14); fx.fillStyle = '#fff'; fx.fillText(txt, tw / 2, top + 7.5); }
       }
     });
@@ -1610,6 +1809,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     $('progress').style.width = (max > 0 ? Math.min(100, (top / max) * 100) : 0) + '%';
     lastScroll = top; updateTopBtn();
     if (minimapOn() && !mmRAF) mmRAF = requestAnimationFrame(() => { mmRAF = 0; syncMinimap(); });
+    if (S.flow) flowOnScroll();
     if (S.mode === 'stream' && Date.now() - curTick > 120) { curTick = Date.now(); updateCurrent(); }
     scheduleSaveProg();
   }, { passive: true });
