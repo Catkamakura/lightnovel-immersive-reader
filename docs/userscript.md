@@ -2,7 +2,7 @@
 
 A single-file Tampermonkey userscript that injects a clean, Google-Docs-style **immersive reader** onto the live site `www.lightnovel.fun` *without replacing it*. Everything lives in one IIFE; the UI is mounted in a Shadow DOM so the host page's CSS can never touch it. This document maps the code so a human or an LLM agent can read, operate, and extend it.
 
-> File: `lightnovel-immersive-reader.user.js` · `@version 1.20.0` · vanilla JS, no dependencies.
+> File: `lightnovel-immersive-reader.user.js` · `@version 1.20.1` · vanilla JS, no dependencies.
 
 ---
 
