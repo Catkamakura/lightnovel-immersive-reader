@@ -901,6 +901,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     return act;
   }
   function flowOnScroll() {
+    if (!$('flowTop') || !$('flowBot')) return;
     const sc = $('scroll');
     if (sc.scrollTop < FLOW_PAD) flowPrepend();
     if (sc.scrollTop + sc.clientHeight > sc.scrollHeight - FLOW_PAD) flowAppend();
