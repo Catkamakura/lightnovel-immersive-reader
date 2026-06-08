@@ -70,21 +70,33 @@ await sleep(p, 300);
 const mm = await ev(p, () => ({ on: document.getElementById('lkir-host').shadowRoot.getElementById('overlay').classList.contains('mm-on'), cw: document.getElementById('lkir-host').shadowRoot.getElementById('mmCanvas').width }));
 check('minimap works in series (current chapter only)', mm.on && mm.cw > 0, 'cw=' + mm.cw);
 
-// download range selector
+// download range selector — list-based picker (click a start chapter, then an end chapter; default = ALL)
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-dlCorner').click());
 await sleep(p, 300);
 const rng = await ev(p, () => {
   const r = document.getElementById('lkir-host').shadowRoot;
-  const from = r.getElementById('dlFrom'), to = r.getElementById('dlTo');
-  const N = Number(to.max);
-  // exercise validation: push 'from' way past the max, commit -> must clamp to N
-  from.value = '99999'; from.dispatchEvent(new Event('input', { bubbles: true })); from.dispatchEvent(new Event('change', { bubbles: true }));
-  const clampedFrom = from.value;
-  from.value = '1'; from.dispatchEvent(new Event('change', { bubbles: true }));   // restore default-all
-  return { shown: getComputedStyle(r.getElementById('dlRange')).display !== 'none', type: from.type, N, fromVal: from.value, toVal: to.value, clampedFrom, fromName: r.getElementById('dlFromName').textContent, toName: r.getElementById('dlToName').textContent };
+  const shown = getComputedStyle(r.getElementById('dlRange')).display !== 'none';
+  const items = [...r.getElementById('dlList').querySelectorAll('.dl-ch')];
+  const N = items.length;
+  const endsAt = () => items.filter((b) => b.classList.contains('end1')).map((b) => Number(b.dataset.i));
+  const insideAt = () => items.filter((b) => b.classList.contains('in')).map((b) => Number(b.dataset.i));
+  const endsDefault = endsAt();                                  // default = whole book → endpoints are first & last
+  const labelled = items[0].querySelector('.ttl').textContent.trim().length > 0;
+  items[1] && items[1].click();                                  // pick start = chapter 2
+  const tipMid = r.getElementById('dlRngTip').textContent.trim();
+  items[3] && items[3].click();                                  // pick end = chapter 4
+  const ends = endsAt(), inside = insideAt(), countSel = r.getElementById('dlRngCount').textContent.trim();
+  r.getElementById('dlRngAll').click();                          // 整本 resets to whole book
+  return { shown, N, labelled, endsDefault, tipMid, ends, inside, countSel, endsAll: endsAt() };
 });
 console.log('  rng:', JSON.stringify(rng));
-check('download shows a numeric chapter range (default = ALL, named ends, clamps invalid input)', rng.shown && rng.type === 'number' && rng.N > 1 && rng.fromVal === '1' && rng.toVal === String(rng.N) && rng.clampedFrom === String(rng.N) && rng.fromName.length > 1 && rng.toName.length > 1);
+check('download range = list picker (default ALL; click start+end selects span; 整本 resets)',
+  rng.shown && rng.N > 3 && rng.labelled
+  && JSON.stringify(rng.endsDefault) === JSON.stringify([0, rng.N - 1])
+  && rng.tipMid.length > 0
+  && JSON.stringify(rng.ends) === JSON.stringify([1, 3]) && JSON.stringify(rng.inside) === JSON.stringify([2])
+  && rng.countSel.indexOf('3 /') === 0
+  && JSON.stringify(rng.endsAll) === JSON.stringify([0, rng.N - 1]), JSON.stringify(rng));
 
 // guide: the Skip button must respond to a REAL mouse click (a programmatic .click()
 // bypasses hit-testing and hid a bug where .guide-step's opacity stacking context ate the click).
