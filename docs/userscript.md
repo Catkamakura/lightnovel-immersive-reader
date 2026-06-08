@@ -164,7 +164,9 @@ Key normalization helpers: `norm` (line 87, folds full-width digits/letters and 
 ### Stream sections vs series chapters
 
 - **Stream** (`mode: 'stream'`): one article, `bounds` cut it into `sections`. `buildSections()` (lines 553–568) turns `bounds` into `[{title, start, end, head}]`, prepends a `卷首` section if content precedes the first boundary, and builds `cat`/`catLabels` (preferring the full detected `catalog` when not manually split).
-- **Series** (`mode: 'series'`): a web novel; `S.toc` is the list of chapter aids, each rendered on its own page via `renderChapter`. The decision happens in `openArticle` (see §9).
+- **Series** (`mode: 'series'`): a web novel; `S.toc` is the list of chapter aids. Two sub-renderers, chosen by the `seamlessScroll` setting (default **on**):
+  - **Seamless flow** (`S.flow === true`, the 起点-style default): `renderFlow(start)` stacks a contiguous **window** of chapter `<section class="ch chap" data-ci>` blocks inside `#content #flow`, bracketed by two height-spacers (`#flowTop`/`#flowBot`) that stand in for the unloaded chapters. On scroll, `flowOnScroll()` auto-loads the next/previous chapter near each edge (`flowAppend`/`flowPrepend`, with scroll-position compensation on prepend) and **unloads** the farthest chapter once the window exceeds `WIN_KEEP` (12) — so a marathon read never bloats the DOM. The **active** chapter (whichever heading sits at the viewport top) drives the outline highlight, the cur-chip, the address bar, and `addHistory` via `flowSetActive`. Bookmarks are per-chapter through the `.blk`'s `data-ci`+`data-bi` (`toggleBookmarkFlow`); a far outline/prev/next jump rebuilds the window (`flowGoto` → `renderFlow`).
+  - **Paged** (`seamlessScroll` off): each chapter is rendered on its own page via `renderChapter` → `renderSeriesBody` with a `.foot` (prev/目录/next). The decision happens in `openArticle` (see §9).
 
 ---
 
