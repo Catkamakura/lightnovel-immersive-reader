@@ -980,7 +980,9 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   function flowUnload(side) {
     const i = side === 'top' ? S.win.first : S.win.last;
     const sec = chapEl(i); if (!sec) return;
-    S.toc[i].h = sec.offsetHeight; sec.remove();
+    S.toc[i].h = sec.offsetHeight;
+    if (flowRO) sec.querySelectorAll('.chunk').forEach((ck) => flowRO.unobserve(ck));   // drop observer registrations with the section
+    sec.remove();
     // growing the top spacer by the exact measured height of what was removed = zero net shift below it
     if (side === 'top') { setTopSpacer(topSpacerH() + S.toc[i].h); S.win.first = i + 1; }
     else { S.win.last = i - 1; setBotSpacer(); }

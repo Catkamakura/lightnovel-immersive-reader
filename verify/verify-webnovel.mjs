@@ -25,6 +25,10 @@ await p.waitForFunction(() => { const r = document.getElementById('lkir-host').s
 await sleep(p, 2500);
 
 const ciSet = () => ev(p, () => [...document.getElementById('lkir-host').shadowRoot.querySelectorAll('#flow .chap[data-ci]')].map((e) => +e.dataset.ci));
+// NaN-guarded min/max: an empty window must FAIL a check (Math.min(...[]) is Infinity and
+// Math.max(...[]) is -Infinity, which can make comparisons pass vacuously)
+const mn = (a) => (a.length ? Math.min(...a) : NaN);
+const mx = (a) => (a.length ? Math.max(...a) : NaN);
 const toCh0 = async () => { await ev(p, () => { const it = document.getElementById('lkir-host').shadowRoot.querySelector('#outlineList .cat-item[data-i="0"]'); if (it) it.click(); }); await sleep(p, 1600); };
 // scroll so the viewport bottom sits just above the LOADED window's bottom edge (inside the append pad;
 // the absolute document bottom would be deep inside the unloaded-spacer void and trigger a far-jump rebuild)
@@ -44,7 +48,7 @@ const beforeFwd = await ciSet();
 await scrollBottom(8);
 const afterFwd = await ciSet();
 console.log('  fwd:', JSON.stringify(beforeFwd), '->', JSON.stringify(afterFwd));
-check('scrolling down auto-loads later chapters (prefetch keeps pace); window stays bounded', Math.max(...afterFwd) >= Math.max(...beforeFwd) + 2 && afterFwd.length <= 13, 'beforeMax=' + Math.max(...beforeFwd) + ' afterMax=' + Math.max(...afterFwd) + ' win=' + afterFwd.length);
+check('scrolling down auto-loads later chapters (prefetch keeps pace); window stays bounded', mx(afterFwd) >= mx(beforeFwd) + 2 && afterFwd.length <= 13, 'beforeMax=' + mx(beforeFwd) + ' afterMax=' + mx(afterFwd) + ' win=' + afterFwd.length);
 
 // far-jump to the LAST chapter via the outline (window rebuilds there), then scroll UP to the window's
 // top edge → the previous chapter prepends (v1 only prepended near absolute scrollTop 0 — broken after any jump)
@@ -58,7 +62,7 @@ await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; c
 await sleep(p, 1400);
 const afterUp = await ciSet();
 console.log('  up:', JSON.stringify(beforeUp), '->', JSON.stringify(afterUp));
-check('scrolling up at the window edge prepends the previous chapter', Math.min(...beforeUp) > 0 && Math.min(...afterUp) < Math.min(...beforeUp), 'beforeMin=' + Math.min(...beforeUp) + ' afterMin=' + Math.min(...afterUp));
+check('scrolling up at the window edge prepends the previous chapter', mn(beforeUp) > 0 && mn(afterUp) < mn(beforeUp), 'beforeMin=' + mn(beforeUp) + ' afterMin=' + mn(afterUp));
 
 // leap deep into spacer territory with the native scrollbar (to ~10% of the book, far above the window)
 // → the window rebuilds around the landing chapter
@@ -72,7 +76,7 @@ const leap = await ev(p, () => {
   return { cis: secs.map((s) => +s.dataset.ci), onScreen, total: r.getElementById('outlineList').querySelectorAll('.cat-item').length };
 });
 console.log('  leap:', JSON.stringify(leap));
-check('a native-scrollbar leap into unloaded territory rebuilds the window there', leap.onScreen && Math.max(...leap.cis) < Math.min(...afterUp), 'cis=' + JSON.stringify(leap.cis) + ' totalCh=' + leap.total);
+check('a native-scrollbar leap into unloaded territory rebuilds the window there', leap.onScreen && mx(leap.cis) < mn(afterUp), 'cis=' + JSON.stringify(leap.cis) + ' totalCh=' + leap.total);
 
 // back to chapter 0; bookmark a paragraph there (per-chapter via data-ci)
 await toCh0();
