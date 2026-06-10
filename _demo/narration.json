@@ -1,0 +1,124 @@
+{
+  "segments": [
+    {
+      "id": "open",
+      "minMs": 10000,
+      "calloutZh": "📖 一键进入沉浸阅读",
+      "calloutEn": "One click to start reading",
+      "zh": "这是轻读，为 lightnovel.fun 打造的沉浸式阅读脚本。在书籍页面、或列表卡片上的小图标，点一下「沉浸阅读」就能进入干净无干扰的阅读界面，原网页不做任何改动。",
+      "en": "This is LightNovel Immersive Reader, a userscript for lightnovel dot fun. On any book page — or from the little icon on list cards — one click opens a clean, distraction-free reader. The original page is never modified."
+    },
+    {
+      "id": "flow",
+      "minMs": 13000,
+      "calloutZh": "♾️ 网文无缝连续滚动（v2.0 新增）",
+      "calloutEn": "Seamless continuous scroll — new in v2.0",
+      "zh": "二点零版本新增网文无缝滚动：读到章节末尾继续往下滚，下一章自动接上，章节之间有清晰的分隔带。章节都提前在后台加载好，完全不用等待。",
+      "en": "New in version two: seamless scrolling. Keep scrolling past a chapter's end and the next chapter flows right in, marked by a clear divider. Chapters are prefetched in the background, so there is never a wait."
+    },
+    {
+      "id": "chip",
+      "minMs": 9000,
+      "calloutZh": "🧭 进度胶囊 + 左侧大纲",
+      "calloutEn": "Position chip + outline",
+      "zh": "左下角的胶囊实时显示当前章节和全书进度；左侧大纲随阅读自动跟随，点击任意章节即可跳转。",
+      "en": "The chip at the bottom left tracks your chapter and overall progress. The outline follows along as you read — click any chapter to jump."
+    },
+    {
+      "id": "minimap",
+      "minMs": 11000,
+      "calloutZh": "🗺️ Sublime 式缩略图与 ↑/↓ 角标",
+      "calloutEn": "Sublime-style minimap with ↑/↓ caps",
+      "zh": "右侧是 Sublime 风格的缩略图，精细呈现当前章节窗口；顶部和底部的角标告诉你窗口之外还有多少章，点哪里就跳到哪里。",
+      "en": "On the right, a Sublime-style minimap shows the loaded chapters in detail. The caps at its edges count the chapters beyond the window — click anywhere to jump."
+    },
+    {
+      "id": "bookmarks",
+      "minMs": 9500,
+      "calloutZh": "🔖 逐章书签",
+      "calloutEn": "Per-chapter bookmarks",
+      "zh": "切到书签标签，点击任意段落就能添加书签；书签按章节归档，缩略图上也有琥珀色的标记。",
+      "en": "Switch to the bookmarks tab and click any paragraph to bookmark it — organized per chapter, with amber ticks on the minimap."
+    },
+    {
+      "id": "themes",
+      "minMs": 11000,
+      "calloutZh": "🎨 主题与排版",
+      "calloutEn": "Themes & typography",
+      "zh": "打开设置：纸白、护眼、夜间等主题，可跟随系统明暗，还能自定义底色；字号、行距、页宽、字体都能随心调。",
+      "en": "Open settings: paper, sepia and night themes, follow-system dark mode, even a custom background color — plus font size, line height, page width and font family."
+    },
+    {
+      "id": "language",
+      "minMs": 8000,
+      "calloutZh": "🌐 中文 / English 界面",
+      "calloutEn": "Bilingual UI",
+      "zh": "界面支持中文和英文，默认跟随系统语言，设置里随时切换。",
+      "en": "The interface speaks both Chinese and English — it follows your system language and switches anytime."
+    },
+    {
+      "id": "resume",
+      "minMs": 10000,
+      "calloutZh": "🕐 续读与进度迁移",
+      "calloutEn": "Resume & progress transfer",
+      "zh": "续读默认开启：网文回到上次读的章节和章内位置，单篇回到上次的滚动位置。进度按登录账号分开保存，还能导出导入，轻松迁移设备。",
+      "en": "Resume is on by default: web novels return to your last chapter and position, single articles to the last scroll spot. Progress is saved per account and can be exported to another device."
+    },
+    {
+      "id": "advanced",
+      "minMs": 10000,
+      "calloutZh": "🧪 实验性：Calibre 书库 + LLM 元数据",
+      "calloutEn": "Experimental: Calibre + LLM metadata",
+      "zh": "高级折叠里还有两个实验性功能：把刚读的 EPUB 直接推进 Calibre 书库，以及用大语言模型自动整理书籍元数据。",
+      "en": "Under the advanced fold, two experimental extras: push the EPUB you just read straight into a Calibre library, and tidy book metadata with a large language model."
+    },
+    {
+      "id": "paged",
+      "minMs": 13000,
+      "calloutZh": "📄 一键切回传统翻页",
+      "calloutEn": "Classic paged mode, one toggle away",
+      "zh": "更喜欢一章一页？关掉「网文连续滚动」，就回到传统的上一章、下一章翻页模式——随时可以再打开。",
+      "en": "Prefer one chapter per page? Turn off continuous scroll for the classic previous-and-next pager — and switch back whenever you like."
+    },
+    {
+      "id": "guide",
+      "minMs": 10000,
+      "calloutZh": "✨ 分步功能向导",
+      "calloutEn": "Step-by-step feature guide",
+      "zh": "忘记某个功能怎么用？设置里的功能向导用聚光灯分步带你重温阅读器的每个角落。",
+      "en": "Forgot how something works? The feature guide in settings spotlights every corner of the reader, step by step."
+    },
+    {
+      "id": "download",
+      "minMs": 9500,
+      "calloutZh": "⤓ 整本下载 EPUB / TXT",
+      "calloutEn": "Download as EPUB / TXT",
+      "zh": "下载整本书：选好章节范围，一键导出带封面和插图的 EPUB，或者纯文本 TXT。",
+      "en": "Download the whole book: pick a chapter range, then export a full EPUB with cover and images, or plain text."
+    },
+    {
+      "id": "switch",
+      "minMs": 7000,
+      "calloutZh": "📚 换一本「整本贴成一篇」的书",
+      "calloutEn": "Now: a whole book in a single post",
+      "zh": "再来看另一类书：整本内容都贴在同一篇文章里的长文。",
+      "en": "Now for another kind of upload — an entire book pasted into one single post."
+    },
+    {
+      "id": "chapterize",
+      "minMs": 15000,
+      "calloutZh": "✂️ 自动分章 + 手动调整",
+      "calloutEn": "Auto chapterization + manual splits",
+      "zh": "整本贴成一篇的长文也不怕：阅读器自动识别正文里的目录、切分章节；再点一次「目录」就能手动调整——点击段落分章，点击分隔条合并。",
+      "en": "Whole books pasted as a single post are no problem: the reader detects the in-text table of contents and splits the chapters automatically. Tap Contents again to adjust by hand — click a paragraph to split, a divider to merge."
+    },
+    {
+      "id": "exit",
+      "minMs": 9000,
+      "calloutZh": "✕ 退出后网站停在你读到的章节",
+      "calloutEn": "Exit lands where you left off",
+      "zh": "退出时，网站会停在你读到的那一章。安装链接见下方说明，祝阅读愉快！",
+      "en": "On exit, the site lands right on the chapter you were reading. Install link below — happy reading!"
+    }
+  ]
+}

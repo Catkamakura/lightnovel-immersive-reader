@@ -16,7 +16,7 @@ const AID = '1144698';
 
 await p.goto('https://www.lightnovel.fun/detail/' + AID, { waitUntil: 'domcontentloaded', timeout: 45000 });
 await sleep(p, 2200);
-await ev(p, () => { try { localStorage.setItem('lkir_guided', '1'); localStorage.removeItem('lkir_settings'); Object.keys(localStorage).filter((k) => k.startsWith('lkir_bm_')).forEach((k) => localStorage.removeItem(k)); } catch {} });
+await ev(p, () => { try { localStorage.setItem('lkir_guided', '1'); localStorage.removeItem('lkir_settings'); localStorage.removeItem('lir_progress'); Object.keys(localStorage).filter((k) => k.startsWith('lkir_bm_')).forEach((k) => localStorage.removeItem(k)); } catch {} });
 await p.addScriptTag({ content: GM });
 await p.addScriptTag({ content: SCRIPT });
 await p.waitForFunction(() => !!document.getElementById('lkir-host'), { timeout: 8000 });
@@ -24,43 +24,83 @@ await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById
 await p.waitForFunction(() => { const r = document.getElementById('lkir-host').shadowRoot; const e = r.getElementById('content'); return e && !/加载中/.test(e.textContent) && (e.querySelector('.body') || e.querySelector('.foot')); }, { timeout: 30000 }).catch(() => {});
 await sleep(p, 2500);
 
+const ciSet = () => ev(p, () => [...document.getElementById('lkir-host').shadowRoot.querySelectorAll('#flow .chap[data-ci]')].map((e) => +e.dataset.ci));
+// NaN-guarded min/max: an empty window must FAIL a check (Math.min(...[]) is Infinity and
+// Math.max(...[]) is -Infinity, which can make comparisons pass vacuously)
+const mn = (a) => (a.length ? Math.min(...a) : NaN);
+const mx = (a) => (a.length ? Math.max(...a) : NaN);
+const toCh0 = async () => { await ev(p, () => { const it = document.getElementById('lkir-host').shadowRoot.querySelector('#outlineList .cat-item[data-i="0"]'); if (it) it.click(); }); await sleep(p, 1600); };
+// scroll so the viewport bottom sits just above the LOADED window's bottom edge (inside the append pad;
+// the absolute document bottom would be deep inside the unloaded-spacer void and trigger a far-jump rebuild)
+const scrollBottom = async (n) => { for (let k = 0; k < n; k++) { await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const sc = r.getElementById('scroll'); const secs = [...r.querySelectorAll('#flow .chap[data-ci]')]; const last = secs[secs.length - 1]; if (!last) return; const bot = last.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop + last.offsetHeight; sc.scrollTop = Math.max(0, bot - sc.clientHeight - 100); sc.dispatchEvent(new Event('scroll')); }); await sleep(p, 550); } };
+
 const base = await ev(p, () => {
   const r = document.getElementById('lkir-host').shadowRoot;
-  return { series: !!r.querySelector('#content .foot'), blk: r.querySelectorAll('#content .body .blk[data-bi]').length, tabs: [...r.getElementById('outlineTabs').querySelectorAll('button')].map((b) => b.textContent.trim()), chapters: r.getElementById('outlineList').querySelectorAll('.cat-item').length };
+  return { flow: !!r.querySelector('#content #flow'), chaps: r.querySelectorAll('#flow .chap[data-ci]').length, chunks: r.querySelectorAll('#flow .chunk').length, blk: r.querySelectorAll('#content .body .blk[data-bi]').length, tabs: [...r.getElementById('outlineTabs').querySelectorAll('button')].map((b) => b.textContent.trim()), chapters: r.getElementById('outlineList').querySelectorAll('.cat-item').length };
 });
 console.log('  base:', JSON.stringify(base));
-check('web novel = series (paged) rendering .blk spans', base.series && base.blk > 0, 'blk=' + base.blk + ' chapters=' + base.chapters);
+check('web novel = seamless flow (stacked .chap sections of lazy .chunk wrappers)', base.flow && base.chaps >= 1 && base.chunks >= 1 && base.blk > 0, 'chaps=' + base.chaps + ' chunks=' + base.chunks + ' blk=' + base.blk + ' chapters=' + base.chapters);
 check('书签 tab present in series', base.tabs.some((t) => t.includes('书签')));
 
-// enter bookmark mode, bookmark a paragraph in ch1
-await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const t = [...r.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.textContent.includes('书签')); t.click(); });
-await sleep(p, 450);
-const marking = await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('overlay').classList.contains('marking'));
-await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const blk = r.querySelector('#content .body .blk[data-bi]'); if (blk) blk.click(); });
-await sleep(p, 600);
-const bm1 = await ev(p, () => ({ items: document.getElementById('lkir-host').shadowRoot.querySelectorAll('.bm-item').length, marks: document.getElementById('lkir-host').shadowRoot.querySelectorAll('#content .body .blk.bm').length }));
-console.log('  bm1:', JSON.stringify(bm1), 'marking=' + marking);
-check('series bookmark added to current chapter', marking && bm1.items >= 1 && bm1.marks >= 1);
+// jump to chapter 0, then verify FORWARD auto-load on scroll (prefetch keeps pace; window stays bounded)
+await toCh0();
+const beforeFwd = await ciSet();
+await scrollBottom(8);
+const afterFwd = await ciSet();
+console.log('  fwd:', JSON.stringify(beforeFwd), '->', JSON.stringify(afterFwd));
+check('scrolling down auto-loads later chapters (prefetch keeps pace); window stays bounded', mx(afterFwd) >= mx(beforeFwd) + 2 && afterFwd.length <= 13, 'beforeMax=' + mx(beforeFwd) + ' afterMax=' + mx(afterFwd) + ' win=' + afterFwd.length);
 
-// switch to a DIFFERENT chapter via the 目录 list → its bookmarks must be its own (ch1 hidden)
-await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const t = [...r.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.dataset.t === 'toc'); t.click(); });
-await sleep(p, 400);
-const sw = await ev(p, () => {
-  const r = document.getElementById('lkir-host').shadowRoot;
-  const items = [...r.getElementById('outlineList').querySelectorAll('.cat-item')];
-  const cur = items.findIndex((x) => x.classList.contains('active'));
-  const before = (r.querySelector('#content h1') || {}).textContent || '';
-  const target = items.find((x, i) => i !== (cur < 0 ? 0 : cur));
-  if (target) target.click();
-  return new Promise((res) => setTimeout(() => res({ before, after: (r.querySelector('#content h1') || {}).textContent || '' }), 2600));
+// far-jump to the LAST chapter via the outline (window rebuilds there), then scroll UP to the window's
+// top edge → the previous chapter prepends (v1 only prepended near absolute scrollTop 0 — broken after any jump)
+await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const items = [...r.getElementById('outlineList').querySelectorAll('.cat-item')]; items[items.length - 1].click(); });
+await sleep(p, 2200);
+const beforeUp = await ciSet();
+// scroll DOWN a little first (edge loading is direction-gated), then UP to the window's top edge
+await ev(p, () => { const sc = document.getElementById('lkir-host').shadowRoot.getElementById('scroll'); sc.scrollTop = sc.scrollTop + 400; sc.dispatchEvent(new Event('scroll')); });
+await sleep(p, 300);
+await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const sc = r.getElementById('scroll'); const first = r.querySelector('#flow .chap[data-ci]'); const top = first.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; sc.scrollTop = top + 60; sc.dispatchEvent(new Event('scroll')); });
+await sleep(p, 1400);
+const afterUp = await ciSet();
+console.log('  up:', JSON.stringify(beforeUp), '->', JSON.stringify(afterUp));
+check('scrolling up at the window edge prepends the previous chapter', mn(beforeUp) > 0 && mn(afterUp) < mn(beforeUp), 'beforeMin=' + mn(beforeUp) + ' afterMin=' + mn(afterUp));
+
+// leap deep into spacer territory with the native scrollbar (to ~10% of the book, far above the window)
+// → the window rebuilds around the landing chapter
+await ev(p, () => { const sc = document.getElementById('lkir-host').shadowRoot.getElementById('scroll'); sc.scrollTop = (sc.scrollHeight - sc.clientHeight) * 0.1; sc.dispatchEvent(new Event('scroll')); });
+await sleep(p, 2600);
+const leap = await ev(p, () => {
+  const r = document.getElementById('lkir-host').shadowRoot, sc = r.getElementById('scroll');
+  const secs = [...r.querySelectorAll('#flow .chap[data-ci]')];
+  const mid = sc.scrollTop + sc.clientHeight / 2;
+  const onScreen = secs.some((s) => { const t = s.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; return t <= mid && t + s.offsetHeight >= mid; });
+  return { cis: secs.map((s) => +s.dataset.ci), onScreen, total: r.getElementById('outlineList').querySelectorAll('.cat-item').length };
 });
+console.log('  leap:', JSON.stringify(leap));
+check('a native-scrollbar leap into unloaded territory rebuilds the window there', leap.onScreen && mx(leap.cis) < mn(afterUp), 'cis=' + JSON.stringify(leap.cis) + ' totalCh=' + leap.total);
+
+// back to chapter 0; bookmark a paragraph there (per-chapter via data-ci)
+await toCh0();
+await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const t = [...r.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.textContent.includes('书签')); t.click(); });
+await sleep(p, 500);
+const marking = await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('overlay').classList.contains('marking'));
+await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const blk = r.querySelector('#flow .chap[data-ci="0"] .blk[data-bi]'); if (blk) blk.click(); });
+await sleep(p, 600);
+const bm1 = await ev(p, () => ({ items: document.getElementById('lkir-host').shadowRoot.querySelectorAll('.bm-item').length, marks: document.getElementById('lkir-host').shadowRoot.querySelectorAll('#flow .chap[data-ci="0"] .blk.bm').length }));
+console.log('  bm1:', JSON.stringify(bm1), 'marking=' + marking);
+check('seamless bookmark added to the active chapter (per-chapter, data-ci)', marking && bm1.items >= 1 && bm1.marks >= 1);
+
+// switch to a far DIFFERENT chapter → it shows only its own (empty) bookmarks
+await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const t = [...r.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.dataset.t === 'toc'); t.click(); });
+await sleep(p, 300);
+const tIdx = await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const items = [...r.getElementById('outlineList').querySelectorAll('.cat-item')]; const last = items[items.length - 1]; last.click(); return last.dataset.i; });
+await sleep(p, 2400);
 await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const t = [...r.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.textContent.includes('书签')); t.click(); });
 await sleep(p, 600);
-const ch2 = await ev(p, () => ({ items: document.getElementById('lkir-host').shadowRoot.querySelectorAll('.bm-item').length, marks: document.getElementById('lkir-host').shadowRoot.querySelectorAll('#content .body .blk.bm').length }));
-console.log('  ch2:', JSON.stringify(ch2), 'changed=' + (sw.before !== sw.after));
-check('a different chapter shows only its own bookmarks (per-chapter)', sw.before !== sw.after && ch2.items === 0 && ch2.marks === 0);
+const ch2 = await ev(p, (ti) => { const r = document.getElementById('lkir-host').shadowRoot; return { switched: !!r.querySelector('#flow .chap[data-ci="' + ti + '"]') && !r.querySelector('#flow .chap[data-ci="0"]'), items: r.querySelectorAll('.bm-item').length, marks: r.querySelectorAll('#flow .chap[data-ci="' + ti + '"] .blk.bm').length }; }, tIdx);
+console.log('  ch2:', JSON.stringify(ch2), 'want=' + tIdx);
+check('a different chapter shows only its own (empty) bookmarks (per-chapter)', ch2.switched && ch2.items === 0 && ch2.marks === 0);
 
-// minimap in series
+// minimap in the seamless flow (windowed map + ↑ cap, since we're on the last chapter)
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-set').click());
 await sleep(p, 300);
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('s-minimap').click());
@@ -68,7 +108,26 @@ await sleep(p, 700);
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-set').click());
 await sleep(p, 300);
 const mm = await ev(p, () => ({ on: document.getElementById('lkir-host').shadowRoot.getElementById('overlay').classList.contains('mm-on'), cw: document.getElementById('lkir-host').shadowRoot.getElementById('mmCanvas').width }));
-check('minimap works in series (current chapter only)', mm.on && mm.cw > 0, 'cw=' + mm.cw);
+check('minimap works in the seamless flow', mm.on && mm.cw > 0, 'cw=' + mm.cw);
+
+// the cur-chip carries the book-wide readout "· 第 i / N 章 · ~B%"
+const chip = await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('curChip').textContent);
+console.log('  chip:', JSON.stringify(chip));
+check('current chip shows the Ch i / N · ~% readout', /·/.test(chip) && /%/.test(chip), chip);
+
+// seamless toggle: OFF -> paged (.foot returns, #flow gone), ON -> flow again
+await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-set').click());
+await sleep(p, 300);
+await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('s-seamless').click());
+await sleep(p, 1500);
+const paged = await ev(p, () => ({ foot: !!document.getElementById('lkir-host').shadowRoot.querySelector('#content .foot'), flow: !!document.getElementById('lkir-host').shadowRoot.querySelector('#flow') }));
+await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('s-seamless').click());
+await sleep(p, 1500);
+const flowBack = await ev(p, () => !!document.getElementById('lkir-host').shadowRoot.querySelector('#flow'));
+await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-set').click());
+await sleep(p, 250);
+console.log('  toggle:', JSON.stringify(paged), 'flowBack=' + flowBack);
+check('seamless toggle: off -> paged (.foot), on -> flow', paged.foot && !paged.flow && flowBack);
 
 // download range selector — list-based picker (click a start chapter, then an end chapter; default = ALL)
 await ev(p, () => document.getElementById('lkir-host').shadowRoot.getElementById('t-dlCorner').click());
