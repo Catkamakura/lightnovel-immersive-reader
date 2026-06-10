@@ -1,0 +1,68 @@
+{
+  "segments": [
+    {
+      "id": "open",
+      "minMs": 7000,
+      "calloutZh": "📖 一键进入沉浸阅读",
+      "calloutEn": "One click to start reading",
+      "zh": "这是轻读，为 lightnovel.fun 打造的沉浸式阅读脚本。在书籍页面点一下「沉浸阅读」，就能进入干净无干扰的阅读界面。",
+      "en": "This is LightNovel Immersive Reader, a userscript for lightnovel dot fun. On any book page, one click opens a clean, distraction-free reader."
+    },
+    {
+      "id": "flow",
+      "minMs": 12000,
+      "calloutZh": "♾️ 网文无缝连续滚动（v2.0 新增）",
+      "calloutEn": "Seamless continuous scroll — new in v2.0",
+      "zh": "二点零版本新增网文无缝滚动：读到章节末尾继续往下滚，下一章自动接上，章节之间有清晰的分隔带。章节都会提前在后台加载好，完全不用等待。",
+      "en": "New in version two: seamless scrolling. Keep scrolling past a chapter's end and the next chapter flows right in, marked by a clear divider. Chapters are prefetched in the background, so there is never a wait."
+    },
+    {
+      "id": "chip",
+      "minMs": 8000,
+      "calloutZh": "🧭 进度胶囊 + 左侧大纲",
+      "calloutEn": "Position chip + outline",
+      "zh": "左下角的胶囊实时显示当前章节和全书进度；左侧大纲随阅读自动跟随，点击任意章节即可跳转。",
+      "en": "The chip at the bottom left tracks your chapter and overall progress. The outline follows along as you read — click any chapter to jump."
+    },
+    {
+      "id": "minimap",
+      "minMs": 10000,
+      "calloutZh": "🗺️ Sublime 式缩略图与 ↑/↓ 角标",
+      "calloutEn": "Sublime-style minimap with ↑/↓ caps",
+      "zh": "右侧是 Sublime 风格的缩略图，精细呈现当前章节窗口；顶部和底部的角标告诉你窗口之外还有多少章，点哪里就跳到哪里。",
+      "en": "On the right, a Sublime-style minimap shows the loaded chapters in detail. The caps at its edges count the chapters beyond the window — click anywhere to jump."
+    },
+    {
+      "id": "bookmarks",
+      "minMs": 9000,
+      "calloutZh": "🔖 逐章书签",
+      "calloutEn": "Per-chapter bookmarks",
+      "zh": "切到书签标签，点击任意段落就能添加书签；书签按章节归档，缩略图上也有琥珀色的标记。",
+      "en": "Switch to the bookmarks tab and click any paragraph to bookmark it — organized per chapter, with amber ticks on the minimap."
+    },
+    {
+      "id": "settings",
+      "minMs": 9000,
+      "calloutZh": "⚙️ 主题与阅读设置",
+      "calloutEn": "Themes & reading settings",
+      "zh": "设置里可以换主题、调字号、行距和页宽，开关连续滚动与续读；进度按账号保存，还能导出导入。",
+      "en": "In settings: themes, font size, line height and page width — plus toggles for seamless scrolling and resume. Progress is saved per account and can be exported."
+    },
+    {
+      "id": "download",
+      "minMs": 9000,
+      "calloutZh": "⤓ 整本下载 EPUB / TXT",
+      "calloutEn": "Download as EPUB / TXT",
+      "zh": "下载整本书：选好章节范围，一键导出带封面和插图的 EPUB，或者纯文本 TXT。",
+      "en": "Download the whole book: pick a chapter range, then export a full EPUB with cover and images, or plain text."
+    },
+    {
+      "id": "exit",
+      "minMs": 7000,
+      "calloutZh": "✕ 退出后网站停在你读到的章节",
+      "calloutEn": "Exit lands where you left off",
+      "zh": "退出时，网站会停在你读到的那一章。安装链接见下方说明，祝阅读愉快！",
+      "en": "On exit, the site lands right on the chapter you were reading. Install link below — happy reading!"
+    }
+  ]
+}

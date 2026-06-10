@@ -1,0 +1,50 @@
+[
+  {
+    "id": "open",
+    "ms": 11750,
+    "zhMs": 10850,
+    "enMs": 10320
+  },
+  {
+    "id": "flow",
+    "ms": 15300,
+    "zhMs": 14400,
+    "enMs": 14380
+  },
+  {
+    "id": "chip",
+    "ms": 10760,
+    "zhMs": 9860,
+    "enMs": 9260
+  },
+  {
+    "id": "minimap",
+    "ms": 12710,
+    "zhMs": 11810,
+    "enMs": 10700
+  },
+  {
+    "id": "bookmarks",
+    "ms": 10090,
+    "zhMs": 9190,
+    "enMs": 7920
+  },
+  {
+    "id": "settings",
+    "ms": 12250,
+    "zhMs": 9890,
+    "enMs": 11350
+  },
+  {
+    "id": "download",
+    "ms": 9180,
+    "zhMs": 8280,
+    "enMs": 7850
+  },
+  {
+    "id": "exit",
+    "ms": 8560,
+    "zhMs": 7660,
+    "enMs": 7370
+  }
+]

@@ -9,18 +9,43 @@ A single-file **Tampermonkey / Violentmonkey userscript** that injects a clean, 
 
 ## Features
 
+- **Seamless continuous scroll for web novels** *(new in v2.0)* — read straight through the book: scrolling past a chapter's end flows into the next chapter, scrolling up flows into the previous one, Qidian-style. Chapters are **prefetched in the background** so the boundary never waits on the network, bodies render in **lazy chunks** (offscreen text costs no layout/paint), and a wide **❖ divider** makes every chapter boundary unmistakable. A floating chip shows `chapter · 第 i / N 章 · ~book%`. Prefer pages? One settings toggle (**网文连续滚动**) returns to the classic one-chapter-per-page reader.
 - **Immersive reader overlay** — paper/sepia/green/dark themes, adjustable font, size, line-height, page width; nothing on the real page is modified.
 - **Left outline** (类 Google Docs) — jump to any section or chapter.
 - **Auto + manual chapterization** — long single articles are auto-split into sections; you can also split/merge chapters by hand.
 - **Per-chapter bookmarks**, grouped by chapter in the outline.
-- **Sublime-style minimap** — a code-editor-style page map with **click-to-jump** (jumps to the content under the cursor).
+- **Sublime-style minimap** — a code-editor-style page map with **click-to-jump**. In seamless mode it maps the loaded chapter window in detail, with pinned **↑ / ↓ caps** showing how many chapters lie beyond — click a cap to jump there; the native scrollbar remains the whole-book position.
 - **Themes** — built-ins plus **follow-system** (auto light/dark) and a **custom hex** background color.
 - **UI language** — **English / 中文**, defaults to your system language, switchable in settings.
-- **Resume reading** — web novels resume at the last-read **chapter** from LightNovel's *own* history; single-article books resume at the last **scroll position** from local memory. Progress is account-scoped and **export / import**able.
+- **Resume reading** — web novels resume at the last-read **chapter** from LightNovel's *own* history (plus the within-chapter position in seamless mode); single-article books resume at the last **scroll position** from local memory. Progress is account-scoped and **export / import**able.
 - **Export** — one-click **EPUB** (with cover + embedded images) or **TXT**, with a selectable **chapter range**. **EPUB3 by default** (current standard) with an **EPUB2 fallback** for older devices/readers — see below.
 - **Send to Calibre** — POST the exact EPUB you read to the optional [`calibre-bridge`](calibre-bridge/) companion, which drops it into a Calibre-Web-Automated library. *(experimental — see below.)*
 - **Metadata** — a rule-based credit parser (作者 / 插画 / 翻译 / 图源 / 录入, simplified + traditional) plus an **optional LLM path** (OpenAI-compatible / DeepSeek / Kimi) that reads only the short 卷首 credit block and is cached per book. *(experimental — see below.)*
 - **Step-by-step feature guide (功能向导)** — 11 steps that walk through both the reader and the settings (theme, EPUB version, resume, the experimental folds). The spotlight is positioned after the panel/scroll settles so it matches the element's real position, and the reader is non-interactive during the guide so you can't mis-click.
+
+## Highlights
+
+**Seamless scroll** — chapters flow into each other with a clear ❖ divider; the outline tracks the chapter you're in and the minimap (right) maps the loaded window with ↑/↓ caps:
+
+![Seamless continuous scroll with the chapter divider, outline and minimap](docs/assets/readme-flow.png)
+
+**Bookmarks** — switch to the 书签 tab and click any paragraph; marks show inline, in the outline, and as amber ticks on the minimap:
+
+![Per-chapter bookmarks](docs/assets/readme-bookmarks.png)
+
+**Download with a chapter range** — pick a start and an end chapter (or type numbers), then export EPUB/TXT:
+
+![Download dialog with the chapter-range picker](docs/assets/readme-download.png)
+
+**Settings** — theme/font/width, minimap, seamless scroll, resume, EPUB version, and the experimental integrations:
+
+![Reading settings](docs/assets/readme-settings.png)
+
+## Video demo
+
+A narrated walkthrough (with on-screen guides and bilingual subtitles) lives in the repo:
+
+- 🎬 **[Demo — Chinese narration](docs/assets/demo-zh.mp4)** · **[English narration](docs/assets/demo-en.mp4)** (中文/English subtitles in both)
 
 ## EPUB output
 
