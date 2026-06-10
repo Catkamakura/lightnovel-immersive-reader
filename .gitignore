@@ -27,6 +27,16 @@ calibre-bridge/data/
 _shots*/
 verify/_shots*/
 
+# ── demo-video pipeline: generated media (the scripts + narration ARE committed) ──
+_demo/tts-*.mp3
+_demo/plan.json
+_demo/offsets.json
+_demo/base.mp4
+_demo/narr-*.m4a
+_demo/*.webm
+_demo/frame-*.png
+_demo/fail.png
+
 # ── editor / OS ──
 .DS_Store
 Thumbs.db
