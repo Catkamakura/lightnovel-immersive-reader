@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.21.0
+// @version      1.22.0
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
@@ -48,7 +48,9 @@
   const DEFAULTS = { theme: 'system', customColor: '#f3ead6', fontSize: 19, lineHeight: 1.9, width: 740, font: 'system', autoOpen: false, showOutline: true, minimap: false, lang: 'system',
     libEnable: false, libUrl: 'http://127.0.0.1:8788', libToken: '', resume: true,
     llmEnable: false, llmProvider: 'openai', llmBase: '', llmKey: '', llmModel: '', epubVer: 3,
-    foldAdv: false };
+    foldAdv: false, seamlessScroll: true };
+  const WIN_KEEP = 12;      // seamless web-novel: max chapters kept in the DOM at once (distant ones unload to spacers)
+  const CHUNK_BLOCKS = 30;  // seamless web-novel: blocks per lazy-rendered .chunk (content-visibility: auto)
 
   let settings = (() => { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}')); } catch { return Object.assign({}, DEFAULTS); } })();
   const saveSettings = () => localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
@@ -74,6 +76,7 @@
     '自定义底色（如 #AA4A44）': 'Custom background (e.g. #AA4A44)', '字号': 'Font size', '行距': 'Line height', '页宽': 'Page width', '字体': 'Font',
     '系统': 'System', '黑体': 'Sans', '宋体': 'Serif',
     '显示目录侧栏（电脑端）': 'Show outline sidebar (desktop)', '右侧缩略图 Minimap（电脑端）': 'Minimap (desktop)', '进入详情页自动沉浸': 'Auto-open reader on a detail page',
+    '网文连续滚动': 'Continuous scroll (web novels)', '像起点那样：滚到底自动接上下一章、向上滚动接上一章；章节会提前在后台取好、远处章节自动卸载。关掉则一章一页、用上一章 / 下一章翻页。': 'Qidian-style: reaching the bottom flows into the next chapter and scrolling up into the previous one; chapters are prefetched in the background and distant ones unload. Turn off for one-chapter-per-page with Prev / Next.',
     '语言': 'Language', '阅读进度': 'Reading progress', '网文回到上次看的章节，单篇回到上次的位置': 'Web novels return to the last chapter; single articles to the last position',
     '导出进度': 'Export', '导入进度': 'Import', '进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。': 'Progress is stored locally per signed-in account; export then import to move it between devices (never mixed across accounts).',
     '📖 功能向导 / 使用说明': '📖 Feature guide', '界面做了精简、很多功能被收了起来；忘记某个功能怎么用时，随时点这里重看分步引导。': 'The UI is intentionally minimal and tucks features away — open this anytime for the step-by-step guide.',
@@ -414,6 +417,20 @@
 .content { max-width: var(--ir-width); margin: 0 auto; padding: 64px 24px 96px; font-size: var(--ir-fs); line-height: var(--ir-lh); }
 .content h1.t { font-size: 1.5em; font-weight: 800; text-align: center; margin: 0 0 12px; } .content .meta { text-align: center; color: var(--ir-muted); font-size: .72em; margin-bottom: 36px; }
 .body p { margin: 0 0 .9em; } .body img { max-width: 100% !important; height: auto !important; display: block; margin: 1.3em auto; border-radius: 8px; } .body a { color: #6366f1; word-break: break-all; } .body hr { border: none; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 35%, transparent); margin: 1.4em 0; } .body table { max-width: 100%; }
+/* seamless web-novel flow: stacked chapter sections with a clear divider; spacers stand in for unloaded chapters */
+.chap { border-top: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); }
+.chap:first-of-type { border-top: none; }
+.chap h1.t { font-size: 1.42em; font-weight: 800; text-align: center; margin: 1.5em 0 10px; line-height: 1.4; }
+.chap .meta { text-align: center; color: var(--ir-muted); font-size: .72em; margin-bottom: 30px; }
+.chap-spacer { width: 100%; }
+/* lazy chunk rendering: offscreen chunks skip layout/paint entirely; contain-intrinsic-size (inline,
+   estimated from text length) is the placeholder height, and 'auto' remembers the real height once
+   rendered so a re-skipped chunk can never shift the scroll position */
+.chunk { content-visibility: auto; }
+.flow-load { text-align: center; color: var(--ir-muted); font-size: .8em; padding: 18px 0; }
+/* flow owns all scroll compensation (spacer math + ResizeObserver pinning) — turn the browser's native
+   scroll anchoring off so the two never double-correct the same mutation */
+.scroll.flow { overflow-anchor: none; }
 .foot { display: flex; gap: 12px; justify-content: space-between; margin-top: 50px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 22%, transparent); }
 .foot button { flex: 1; padding: 12px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; border: 1px solid color-mix(in srgb, var(--ir-muted) 30%, transparent); background: var(--ir-surface); color: var(--ir-text); } .foot button.primary { background: #6366f1; color: #fff; border-color: #6366f1; } .foot button:disabled { opacity: .35; cursor: not-allowed; }
 .rail { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 5; display: flex; flex-direction: column; gap: 2px; padding: 7px 5px; border-radius: 18px; background: color-mix(in srgb, var(--ir-surface) 90%, transparent); border: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); backdrop-filter: blur(10px); box-shadow: 0 8px 26px rgba(0,0,0,.16); }
@@ -629,10 +646,12 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   let suppressTocHover = false; // after clicking onto 目录, don't show the 调整分章 hover until the mouse leaves
   let dlFrom = 0, dlTo = 0, dlPhase = 'start'; // series download range picker (0-based inclusive; phase = which click comes next)
   function resetState(aid) {
+    if (S && S.flow) flowTeardown();
     S = { aid, detail: null, raw: '', rawLen: 0, author: '', bookTitle: '', busy: false, mode: 'stream', mode2: 'read',
       blocks: [], bclean: [], bounds: [], catalog: [], sections: [], secLabels: [], cat: [], catLabels: [], manualSplit: false,
       cblocks: [], cbclean: [],
-      bookmarks: [], bmConfirm: null, outlineTab: 'toc', toc: [], idx: 0, volumes: [], volLabels: [], downloadable: false };
+      bookmarks: [], bmConfirm: null, outlineTab: 'toc', toc: [], idx: 0, volumes: [], volLabels: [], downloadable: false,
+      flow: false, win: { first: 0, last: 0 } };   // seamless web-novel: contiguous loaded-chapter window
   }
   resetState(null);
   const lightClean = (s) => (s || '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '').replace(/\son\w+="[^"]*"/gi, '');
@@ -726,7 +745,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   }
   function onBodyClick(e) {
     if (S.mode2 === 'split') { const x = e.target.closest('.sep-x'); if (x) { e.preventDefault(); removeBound(Number(x.dataset.bi)); return; } const blk = e.target.closest('.blk'); if (blk) { e.preventDefault(); addBound(Number(blk.dataset.bi)); } return; }
-    if (S.mode2 === 'bookmark') { const blk = e.target.closest('.blk'); if (blk) { e.preventDefault(); toggleBookmark(Number(blk.dataset.bi)); } }
+    if (S.mode2 === 'bookmark') { const blk = e.target.closest('.blk'); if (blk) { e.preventDefault(); if (S.flow) toggleBookmarkFlow(Number(blk.dataset.ci), Number(blk.dataset.bi)); else toggleBookmark(Number(blk.dataset.bi)); } }
   }
   function keepRender() { const y = $('scroll').scrollTop; renderStream(true); $('scroll').scrollTop = y; }
   function addBound(bi) { if (bi <= 0 || S.bounds.includes(bi)) return; S.bounds = [...S.bounds, bi].sort((a, b) => a - b); saveSplit(); keepRender(); renderOutline(); }
@@ -739,7 +758,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     else { S.bookmarks.push({ bi, label: ((blocks[bi] && blocks[bi].text) || '［图片］').slice(0, 30) }); S.bookmarks.sort((a, b) => a.bi - b.bi); flashToast('已添加书签'); }
     saveBM(); if (S.mode === 'series') renderSeriesBody(true); else keepRender(); renderOutline();
   }
-  function jumpToBlock(bi) { const el = $('content').querySelector('.blk[data-bi="' + bi + '"]'); if (el) pinScroll(() => secTop(el) - 40); }
+  function jumpToBlock(bi) { const sel = S.flow ? '.chap[data-ci="' + S.idx + '"] .blk[data-bi="' + bi + '"]' : '.blk[data-bi="' + bi + '"]'; const el = $('content').querySelector(sel); if (el) pinScroll(() => secTop(el) - 40); }
 
   /* ----- interactive modes ----- */
   function enterMode(m) {
@@ -748,13 +767,19 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     if (S.mode2 === m) { exitMode(); return; }
     S.mode2 = m; S.bmConfirm = null;
     S.outlineTab = m === 'split' ? 'toc' : 'bm';
-    if (S.mode === 'series') renderSeriesBody(true); else keepRender();
+    if (S.flow) flowRefresh(); else if (S.mode === 'series') renderSeriesBody(true); else keepRender();
     if (!isMobile()) openOutline(true); renderOutline();
   }
-  function exitMode() { if (S.mode2 === 'read') return; S.mode2 = 'read'; S.bmConfirm = null; suppressTocHover = true; if (S.mode === 'stream') keepRender(); else if (S.mode === 'series') renderSeriesBody(true); renderOutline(); }
+  function exitMode() { if (S.mode2 === 'read') return; S.mode2 = 'read'; S.bmConfirm = null; suppressTocHover = true; if (S.flow) flowRefresh(); else if (S.mode === 'stream') keepRender(); else if (S.mode === 'series') renderSeriesBody(true); renderOutline(); }
 
   /* ----- series (paged) ----- */
-  async function ensureHtml(i) { const c = S.toc[i]; if (c.html == null) { try { c.html = await getContent(c.aid); } catch { c.html = '<p>本章无法获取（可能仅限 App）。</p>'; } } return c.html; }
+  // single-flight per chapter: a prefetch and a render that race for the same chapter share one request
+  function ensureHtml(i) {
+    const c = S.toc[i];
+    if (c.html != null) return Promise.resolve(c.html);
+    if (!c._p) c._p = getContent(c.aid).then((h) => (c.html = h)).catch(() => (c.html = '<p>本章无法获取（可能仅限 App）。</p>')).finally(() => { delete c._p; });
+    return c._p;
+  }
   async function renderChapter(i) {
     S.idx = i; savedScroll = null; S.mode2 = S.outlineTab === 'bm' ? 'bookmark' : 'read'; updateTopBtn();
     const c = S.toc[i]; $('scroll').scrollTop = 0; $('progress').style.width = '0';
@@ -786,6 +811,243 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     buildMinimap(); scheduleMinimap(700);
   }
 
+  /* ----- series (SEAMLESS continuous flow v2, 起点-style) -----
+     A window of stacked chapter sections; the scroll flows into the next/prev chapter at each window
+     edge and distant chapters unload to height-spacers. Why v2 (v1.19's flow was removed as too slow):
+       1. PREFETCH — chapter HTML is fetched 2 ahead / 1 behind while reading, so reaching an edge is a
+          memory-only append instead of a network wait;
+       2. LAZY CHUNK RENDERING — chapter bodies are split into .chunk wrappers (content-visibility:auto
+          + an estimated contain-intrinsic-size), so offscreen text costs no layout/paint until it nears
+          the viewport — appends are cheap no matter how big the chapter is;
+       3. EDGE TRIGGERS RELATIVE TO THE WINDOW (v1 used absolute scrollTop, so after a far jump the
+          upward flow hit a void of blank spacer), separate append/prepend single-flight guards, and a
+          leap into spacer territory (native scrollbar drag) rebuilds around the estimated chapter;
+       4. EXACT SPACER ACCOUNTING — the top spacer only changes by the very amount inserted/removed next
+          to it, and a ResizeObserver on every .chunk re-pins the viewport when content ABOVE it changes
+          height (first-render corrections, late images) — no scroll jumps, no double-correction
+          (native overflow-anchor is off in flow). ----- */
+  let flowRO = null, flowGen = 0, flowVoidT = 0, flowAppendBusy = false, flowPrependBusy = false;
+  const flowChunkH = new WeakMap();   // chunk el -> last seen height (-1 = baseline pending)
+  function chapBlocks(i) { const c = S.toc[i]; if (!c.blocks) { c.blocks = splitBlocks(c.html || ''); c.bclean = []; } return c.blocks; }
+  function chapBm(i) { const c = S.toc[i]; if (!c.bm) c.bm = loadBM(c.aid); return c.bm; }
+  function chapAvg() { let sum = 0, n = 0; for (const c of S.toc) if (c.h) { sum += c.h; n++; } return n ? sum / n : 2400; }
+  function estH(i) { return (S.toc[i] && S.toc[i].h) ? S.toc[i].h : chapAvg(); }
+  // chars per wrapped line at the current font/width (CJK glyphs ≈ 1 font-size each) → estimated lines per block
+  function flowCpl() { const cw = Math.min(settings.width || 740, $('scroll').clientWidth || 9999) - 48; return Math.max(8, Math.floor(cw / (settings.fontSize || 19))); }
+  const blkLines = (blk, cpl) => blk.text ? Math.max(1, Math.ceil(blk.text.length / cpl)) : (/<img\b/i.test(blk.html) ? 14 : 1);
+  function chapInnerHtml(i) {
+    const blocks = chapBlocks(i), c = S.toc[i], bm = new Set(chapBm(i).map((b) => b.bi)), inter = S.mode2 === 'bookmark';
+    const cpl = flowCpl(), lh = (settings.fontSize || 19) * (settings.lineHeight || 1.9);
+    let body = '';
+    for (let s = 0; s < blocks.length; s += CHUNK_BLOCKS) {
+      const e = Math.min(blocks.length, s + CHUNK_BLOCKS);
+      let lines = 0, inner = '';
+      for (let bi = s; bi < e; bi++) {
+        lines += blkLines(blocks[bi], cpl);
+        const isBm = bm.has(bi); const mark = isBm ? `<span class="bm-mark" data-ci="${i}" data-jump="${bi}">🔖</span>` : '';
+        inner += `<span class="blk${isBm ? ' bm' : ''}" data-ci="${i}" data-bi="${bi}">${mark}${blkHtml(blocks, c.bclean, bi)}</span><br/>`;
+      }
+      body += `<div class="chunk" data-ck="${s}" style="contain-intrinsic-size:auto ${Math.round(lines * lh)}px">${inner}</div>`;
+    }
+    return '<h1 class="t">' + esc(S.labels[i] || c.title) + '</h1><div class="meta">' + esc(S.author) + ' · ' + esc(chMeta(i + 1, S.toc.length)) + '</div>'
+      + '<div class="body stream' + (inter ? ' interactive marking' : '') + '">' + body + '</div>';
+  }
+  function observeChunks(sec) { if (flowRO) sec.querySelectorAll('.chunk').forEach((ck) => { flowChunkH.set(ck, -1); flowRO.observe(ck); }); }
+  function chapSection(i) {
+    const sec = document.createElement('section'); sec.className = 'ch chap'; sec.id = 'chap-' + i; sec.dataset.ci = i;
+    sec.dataset.label = S.labels[i] || S.toc[i].title || ''; sec.innerHTML = chapInnerHtml(i); observeChunks(sec); return sec;
+  }
+  const chapEl = (i) => $('content').querySelector('.chap[data-ci="' + i + '"]');
+  const chapTop = (i) => { const sec = chapEl(i); return sec ? secTop(sec) : 0; };
+  function measure(i) { const sec = chapEl(i); if (sec) S.toc[i].h = sec.offsetHeight; }
+  // A chunk that changes height while sitting fully ABOVE the viewport (first real render correcting the
+  // estimate, a late image decoding) shifts everything below — counter it so the visible text never moves.
+  function onFlowResize(entries) {
+    if (!S.flow) return;
+    const sc = $('scroll'); let shift = 0;
+    for (const en of entries) {
+      const ck = en.target; if (!ck.isConnected) continue;
+      const h = Math.round(en.borderBoxSize && en.borderBoxSize.length ? en.borderBoxSize[0].blockSize : ck.offsetHeight);
+      const prev = flowChunkH.get(ck); flowChunkH.set(ck, h);
+      if (prev == null || prev < 0 || h === prev) continue;
+      if (secTop(ck) + Math.min(prev, h) <= sc.scrollTop + 1) shift += h - prev;
+    }
+    if (shift) sc.scrollTop = Math.max(0, sc.scrollTop + shift);
+  }
+  const topSpacerH = () => { const el = $('flowTop'); return el ? (parseFloat(el.style.height) || 0) : 0; };
+  const setTopSpacer = (px) => { const el = $('flowTop'); if (el) el.style.height = Math.max(0, Math.round(px)) + 'px'; };
+  function setBotSpacer() { const el = $('flowBot'); if (!el) return; let h = 0; for (let j = S.win.last + 1; j < S.toc.length; j++) h += estH(j); el.style.height = Math.round(h) + 'px'; }
+  function flowLoadHint(on) { const el = $('content') && $('content').querySelector('#flowLoad'); if (el) el.style.display = on ? '' : 'none'; }
+  // fire-and-forget: warm the next two chapters (and one behind) so edge hits never wait on the network
+  function flowPrefetch() {
+    if (!S.flow) return;
+    [S.win.last + 1, S.win.last + 2, S.win.first - 1].forEach((j) => { if (j >= 0 && j < S.toc.length && S.toc[j].html == null) ensureHtml(j); });
+  }
+  function flowTeardown() {
+    flowGen++; flowAppendBusy = flowPrependBusy = false; clearTimeout(flowVoidT);
+    if (flowRO) { flowRO.disconnect(); flowRO = null; }
+    const sc = $('scroll'); if (sc) sc.classList.remove('flow');
+    S.flow = false;
+  }
+  async function renderFlow(start) {
+    flowGen++; const gen = flowGen;
+    S.flow = true; S.idx = start; S.win = { first: start, last: start };
+    S.mode2 = S.outlineTab === 'bm' ? 'bookmark' : 'read';
+    flowAppendBusy = flowPrependBusy = false;
+    $('content').innerHTML = '<div class="loading">' + t('加载中…') + '</div>';
+    await ensureHtml(start);
+    if (gen !== flowGen || !S.flow || S.mode !== 'series' || S.aid == null) return;
+    S.bookmarks = chapBm(start); S.bmConfirm = null;
+    if (flowRO) flowRO.disconnect();
+    flowRO = new ResizeObserver(onFlowResize);
+    const wrap = document.createElement('div'); wrap.id = 'flow';
+    const top = document.createElement('div'); top.className = 'chap-spacer'; top.id = 'flowTop';
+    const load = document.createElement('div'); load.className = 'flow-load'; load.id = 'flowLoad'; load.style.display = 'none'; load.textContent = t('加载中…');
+    const bot = document.createElement('div'); bot.className = 'chap-spacer'; bot.id = 'flowBot';
+    wrap.appendChild(top); wrap.appendChild(chapSection(start)); wrap.appendChild(load); wrap.appendChild(bot);
+    $('content').innerHTML = ''; $('content').appendChild(wrap);
+    $('scroll').classList.add('flow');
+    wrap.addEventListener('click', onBodyClick);
+    measure(start);
+    let th = 0; for (let j = 0; j < start; j++) th += estH(j);
+    setTopSpacer(th); setBotSpacer(); flowTail();
+    $('scroll').scrollTop = start <= 0 ? 0 : Math.max(0, chapTop(start) - 4); $('progress').style.width = '0';
+    addHistory(S.toc[start].aid); if (pageAid != null) { try { history.replaceState(history.state, '', '/detail/' + S.toc[start].aid); } catch { /* */ } }
+    $('overlay').classList.toggle('marking', S.mode2 === 'bookmark'); $('overlay').classList.remove('splitting');
+    updateChrome(); buildMinimap(); scheduleMinimap(700);
+    flowPrefetch();
+    restoreFlowProg(start);   // restore the within-chapter position for the resumed chapter
+    flowOnScroll();           // kick the runway build (no scroll event fires when scrollTop didn't change)
+  }
+  async function flowAppend() {
+    if (flowAppendBusy || !S.flow || S.win.last >= S.toc.length - 1) return;
+    const i = S.win.last + 1, gen = flowGen; flowAppendBusy = true;
+    try {
+      if (S.toc[i].html == null) { flowLoadHint(true); await ensureHtml(i); }   // prefetch usually made this instant
+      if (gen !== flowGen || !S.flow || S.win.last !== i - 1) return;
+      $('flowLoad').before(chapSection(i)); S.win.last = i; measure(i);
+      flowTrim('top');
+      setBotSpacer(); flowTail(); flowReresolveActive(); flowPrefetch(); scheduleMinimap(300);
+    } finally { flowAppendBusy = false; flowLoadHint(false); }
+    flowOnScroll();   // keep extending until there's a full pad of runway (a scroll event won't re-fire on its own)
+  }
+  async function flowPrepend() {
+    if (flowPrependBusy || !S.flow || S.win.first <= 0) return;
+    const i = S.win.first - 1, gen = flowGen; flowPrependBusy = true;
+    try {
+      await ensureHtml(i);
+      if (gen !== flowGen || !S.flow || S.win.first !== i + 1) return;
+      const sc = $('scroll'), T = topSpacerH();
+      const used = i === 0 ? T : Math.min(estH(i), T);   // the spacer shrinks by exactly what the scroll math adds back
+      $('flowTop').after(chapSection(i)); S.win.first = i; measure(i);
+      setTopSpacer(T - used);
+      sc.scrollTop = Math.max(0, sc.scrollTop + (S.toc[i].h || 0) - used);   // keep the viewport pinned to what it was showing
+      flowTrim('bot');
+      flowTail(); flowReresolveActive(); flowPrefetch(); scheduleMinimap(300);
+    } finally { flowPrependBusy = false; }
+    flowOnScroll();
+  }
+  // Trim the far side of an over-full window — but only sections that are at least a full pad beyond the
+  // viewport, so a book of tiny chapters can't ping-pong load/unload between the two edge triggers.
+  function flowTrim(side) {
+    const sc = $('scroll'), pad = Math.max(1200, sc.clientHeight * 1.5);
+    while (S.win.last - S.win.first + 1 > WIN_KEEP) {
+      if (side === 'top') {
+        const nf = chapEl(S.win.first + 1);
+        if (!nf || secTop(nf) > sc.scrollTop - pad) break;
+        flowUnload('top');
+      } else {
+        const nl = chapEl(S.win.last - 1);
+        if (!nl || secTop(nl) + nl.offsetHeight < sc.scrollTop + sc.clientHeight + pad) break;
+        flowUnload('bot');
+      }
+    }
+  }
+  function flowUnload(side) {
+    const i = side === 'top' ? S.win.first : S.win.last;
+    const sec = chapEl(i); if (!sec) return;
+    S.toc[i].h = sec.offsetHeight; sec.remove();
+    // growing the top spacer by the exact measured height of what was removed = zero net shift below it
+    if (side === 'top') { setTopSpacer(topSpacerH() + S.toc[i].h); S.win.first = i + 1; }
+    else { S.win.last = i - 1; setBotSpacer(); }
+  }
+  // an edge unload can drop the section S.idx points at — re-resolve so the outline highlight / chip /
+  // bookmark target never point at a removed section until the next scroll tick
+  function flowReresolveActive() { if (S.idx < S.win.first || S.idx > S.win.last) flowSetActive(flowActiveFromScroll()); }
+  // a "全书完" marker once the final chapter is in the window
+  function flowTail() {
+    const have = $('content').querySelector('#flowTail');
+    if (S.win.last >= S.toc.length - 1) { if (!have) { const d = document.createElement('div'); d.id = 'flowTail'; d.className = 'r-tail'; d.innerHTML = '<div class="r-end">— ' + esc(t('全书完')) + ' · ' + S.toc.length + ' ' + esc(t('章节')) + ' —</div>'; $('flowLoad').before(d); } }
+    else if (have) have.remove();
+  }
+  // whichever loaded section's top sits at/above the viewport top probe = the active chapter
+  function flowActiveFromScroll() {
+    const probe = $('scroll').scrollTop + 90; let act = S.win.first;
+    for (let i = S.win.first; i <= S.win.last; i++) { const sec = chapEl(i); if (sec && secTop(sec) <= probe) act = i; }
+    return act;
+  }
+  function flowOnScroll() {
+    const sc = $('scroll'), firstSec = chapEl(S.win.first), lastSec = chapEl(S.win.last);
+    if (!firstSec || !lastSec) return;
+    const winTop = secTop(firstSec), winBot = secTop(lastSec) + lastSec.offsetHeight;
+    const vTop = sc.scrollTop, vBot = vTop + sc.clientHeight, pad = Math.max(1200, sc.clientHeight * 1.5);
+    const slack = sc.clientHeight / 2;   // a momentum flick may overshoot the edge a little — that's not a leap
+    // leapt clear outside the loaded window (native-scrollbar drag into spacer territory)?
+    // once the scroll settles, rebuild the window around the estimated landing chapter.
+    if (vBot < winTop - slack || vTop > winBot + slack) {
+      clearTimeout(flowVoidT);
+      flowVoidT = setTimeout(() => {
+        if (!S.flow || mmDrag) return;
+        const fs = chapEl(S.win.first), ls = chapEl(S.win.last); if (!fs || !ls) return;
+        const mid = $('scroll').scrollTop + $('scroll').clientHeight / 2;
+        const wt = secTop(fs), wb = secTop(ls) + ls.offsetHeight;
+        if (mid >= wt && mid <= wb) return;   // scrolled back inside meanwhile
+        let target;
+        if (mid < wt) { let acc = wt; target = 0; for (let j = S.win.first - 1; j >= 0; j--) { acc -= estH(j); if (mid >= acc) { target = j; break; } } }
+        else { let acc = wb; target = S.toc.length - 1; for (let j = S.win.last + 1; j < S.toc.length; j++) { acc += estH(j); if (mid <= acc) { target = j; break; } } }
+        renderFlow(target);
+      }, 160);
+      return;
+    }
+    if (vTop < winTop + pad) flowPrepend();
+    if (vBot > winBot - pad) flowAppend();
+    const act = flowActiveFromScroll();
+    if (act !== S.idx) flowSetActive(act);
+  }
+  function flowSetActive(i) {
+    S.idx = i; S.bookmarks = chapBm(i); updateCurrent();
+    $('r-prev').disabled = i <= 0; $('r-next').disabled = i >= S.toc.length - 1;
+    if (S.outlineTab === 'bm') renderOutline();   // the 书签 list follows the active chapter
+    clearTimeout(S._flowHistT); S._flowHistT = setTimeout(() => { if (S.flow && S.idx === i && S.toc[i]) { addHistory(S.toc[i].aid); if (pageAid != null) { try { history.replaceState(history.state, '', '/detail/' + S.toc[i].aid); } catch { /* */ } } } }, 600);
+  }
+  function flowGoto(i) {
+    if (i < 0 || i >= S.toc.length) return;
+    if (i >= S.win.first && i <= S.win.last && chapEl(i)) { const sec = chapEl(i); pinScroll(() => secTop(sec) - 4); flowSetActive(i); return; }
+    renderFlow(i);   // far jump → rebuild the window around i
+  }
+  function toggleBookmarkFlow(ci, bi) {
+    const blocks = chapBlocks(ci), list = chapBm(ci);
+    const k = list.findIndex((b) => b.bi === bi);
+    if (k >= 0) { list.splice(k, 1); flashToast('已移除书签'); }
+    else { list.push({ bi, label: ((blocks[bi] && blocks[bi].text) || '［图片］').slice(0, 30) }); list.sort((a, b) => a.bi - b.bi); flashToast('已添加书签'); }
+    try { localStorage.setItem(BM_KEY(S.toc[ci].aid), JSON.stringify(list)); } catch { /* */ }
+    // surgical update of the one block — no section re-render, so chunk render state (and scroll) stay put
+    const sec = chapEl(ci), blkEl = sec && sec.querySelector('.blk[data-bi="' + bi + '"]');
+    if (blkEl) {
+      const on = k < 0; blkEl.classList.toggle('bm', on);
+      const old = blkEl.querySelector('.bm-mark'); if (old) old.remove();
+      if (on) { const m = document.createElement('span'); m.className = 'bm-mark'; m.dataset.ci = ci; m.dataset.jump = bi; m.textContent = '🔖'; blkEl.prepend(m); }
+    }
+    if (ci === S.idx) S.bookmarks = list;
+    renderOutline(); scheduleMinimap(150);
+  }
+  // toggling bookmark mode only changes classes on the loaded chapter bodies — no DOM rebuild
+  function flowRefresh() {
+    const inter = S.mode2 === 'bookmark';
+    for (let i = S.win.first; i <= S.win.last; i++) { const sec = chapEl(i); const b = sec && sec.querySelector('.body'); if (b) { b.classList.toggle('interactive', inter); b.classList.toggle('marking', inter); } }
+    $('overlay').classList.toggle('marking', inter); $('overlay').classList.remove('splitting');
+  }
+
   /* ----- navigation ----- */
   function streamCur() { const secs = [...$('content').querySelectorAll('section.ch')]; const y = $('scroll').scrollTop + 90; let cur = 0; secs.forEach((s, i) => { if (secTop(s) <= y) cur = i; }); return cur; }
   // Instant jump that re-pins a few times as nearby lazy images finish loading (they shift the
@@ -798,8 +1060,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     [60, 180, 360, 650].forEach((d) => setTimeout(() => { if (Math.abs(el.scrollTop - last) <= 2) last = pin(); }, d));
   }
   function scrollToSec(i) { const s = $('content').querySelector('#ch-' + i); if (!s) return; pinScroll(() => secTop(s) - 10); }
-  function goPrev() { if (S.mode === 'series') { if (S.idx > 0) renderChapter(S.idx - 1); return; } const c = streamCur(); const s = $('content').querySelector('#ch-' + c); const atTop = s && secTop(s) >= $('scroll').scrollTop - 16; scrollToSec(atTop ? Math.max(0, c - 1) : c); }
-  function goNext() { if (S.mode === 'series') { if (S.idx < S.toc.length - 1) renderChapter(S.idx + 1); return; } const c = streamCur(); if (c < S.sections.length - 1) scrollToSec(c + 1); }
+  function goPrev() { if (S.flow) { flowGoto(S.idx - 1); return; } if (S.mode === 'series') { if (S.idx > 0) renderChapter(S.idx - 1); return; } const c = streamCur(); const s = $('content').querySelector('#ch-' + c); const atTop = s && secTop(s) >= $('scroll').scrollTop - 16; scrollToSec(atTop ? Math.max(0, c - 1) : c); }
+  function goNext() { if (S.flow) { flowGoto(S.idx + 1); return; } if (S.mode === 'series') { if (S.idx < S.toc.length - 1) renderChapter(S.idx + 1); return; } const c = streamCur(); if (c < S.sections.length - 1) scrollToSec(c + 1); }
 
   function updateChrome() {
     if (S.mode === 'series') { $('r-prev').disabled = S.idx <= 0; $('r-next').disabled = S.idx >= S.toc.length - 1; } else { $('r-prev').disabled = false; $('r-next').disabled = false; }
@@ -865,7 +1127,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       if (list.dataset.sig !== sig || !list.querySelector('.cat-item[data-i]')) {
         list.dataset.sig = sig;
         list.innerHTML = S.toc.map((c, i) => `<button class="cat-item ${i === S.idx ? 'active' : ''}" data-i="${i}" title="${esc(c.title)}"><span class="n">${i + 1}</span><span>${esc(S.labels[i] || c.title)}</span></button>`).join('');
-        list.querySelectorAll('.cat-item').forEach((b) => (b.onclick = () => { if (isMobile()) openOutline(false); renderChapter(Number(b.dataset.i)); }));
+        list.querySelectorAll('.cat-item').forEach((b) => (b.onclick = () => { if (isMobile()) openOutline(false); if (S.flow) flowGoto(Number(b.dataset.i)); else renderChapter(Number(b.dataset.i)); }));
       }
     } else if (S.cat.length <= 1) {
       list.innerHTML = '<div class="cat-note">' + t('本篇为单段内容。再点一次上方「目录」即可进入分章调整、自行划分。') + '</div>';
@@ -890,7 +1152,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       let h = `<div class="bm-grp"><div class="cat-item bm-grp-h" style="cursor:default"><span class="n">▎</span><span>${esc(t)}</span></div>`;
       (groups.get(0) || []).sort((a, b) => a.bi - b.bi).forEach((b) => { const cf = S.bmConfirm === b.bi; h += `<button class="cat-item bm-item" data-jump="${b.bi}" title="${esc(b.label)}"><span class="n">🔖</span><span>${esc(b.label)}</span><span class="bm-del${cf ? ' confirm' : ''}" data-del="${b.bi}">${cf ? '确认删除' : '✕'}</span></button>`; });
       list.innerHTML = h + '</div>';
-      list.querySelectorAll('.bm-item').forEach((b) => (b.onclick = (e) => { const del = e.target.closest('.bm-del'); if (del) { e.stopPropagation(); const bi = Number(del.dataset.del); if (S.bmConfirm === bi) { S.bmConfirm = null; toggleBookmark(bi); } else { S.bmConfirm = bi; renderOutline(); clearTimeout(S._bmT); S._bmT = setTimeout(() => { if (S.bmConfirm === bi) { S.bmConfirm = null; renderOutline(); } }, 2800); } return; } S.bmConfirm = null; if (isMobile()) openOutline(false); jumpToBlock(Number(b.dataset.jump)); }));
+      list.querySelectorAll('.bm-item').forEach((b) => (b.onclick = (e) => { const del = e.target.closest('.bm-del'); if (del) { e.stopPropagation(); const bi = Number(del.dataset.del); if (S.bmConfirm === bi) { S.bmConfirm = null; if (S.flow) toggleBookmarkFlow(S.idx, bi); else toggleBookmark(bi); } else { S.bmConfirm = bi; renderOutline(); clearTimeout(S._bmT); S._bmT = setTimeout(() => { if (S.bmConfirm === bi) { S.bmConfirm = null; renderOutline(); } }, 2800); } return; } S.bmConfirm = null; if (isMobile()) openOutline(false); jumpToBlock(Number(b.dataset.jump)); }));
       return;
     }
     let html = '';
@@ -916,10 +1178,21 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       S.bmConfirm = null; if (isMobile()) openOutline(false); jumpToBlock(Number(b.dataset.jump));
     }));
   }
-  function updateCurrent() {
+  // coarse 0..1 reading fraction WITHIN the active chapter (series mode), for the book-wide % estimate
+  function chapFrac() {
+    const sc = $('scroll'); if (!sc) return 0;
+    if (S.flow) { const sec = chapEl(S.idx); if (!sec) return 0; const h = sec.offsetHeight || 1; const d = sc.scrollTop - chapTop(S.idx); return Math.max(0, Math.min(1, d / h)); }
+    const max = sc.scrollHeight - sc.clientHeight; return max > 0 ? Math.max(0, Math.min(1, sc.scrollTop / max)) : 0;
+  }
+  function updateCurrent(chipOnly) {
     const list = $('outlineList');
     if (S.mode === 'series') {
-      $('curChip').textContent = (S.labels && S.labels[S.idx]) || S.bookTitle || '';
+      const N = S.toc.length, name = (S.labels && S.labels[S.idx]) || S.bookTitle || '';
+      // "<chapter> · Ch i / N · ~B%" — a coarse book-wide position readout
+      let readout = '';
+      if (N > 1) { const bookPct = Math.round(((S.idx + chapFrac()) / N) * 100); readout = ' · ' + chMeta(S.idx + 1, N) + ' · ~' + bookPct + '%'; }
+      $('curChip').textContent = name + readout;
+      if (chipOnly) return;   // scroll-tick refresh of the % only — don't yank the outline list around
       if (list) {
         let act = null;
         list.querySelectorAll('.cat-item').forEach((it) => { const on = it.dataset.i === String(S.idx); it.classList.toggle('active', on); if (on) act = it; });
@@ -975,7 +1248,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
           const li = lr != null ? S.toc.findIndex((t) => t.aid === lr) : -1;
           if (li > 0) { start = li; resumed = true; }
         }
-        S.idx = start; renderChapter(start);
+        S.idx = start; if (settings.seamlessScroll) renderFlow(start); else renderChapter(start);
         if (resumed) flashToast(t('已续读至 ') + (S.labels[S.idx] || ('第' + (S.idx + 1) + '章')));
       } else { S.volumes = series; S.volLabels = chapterLabels(series.map((s) => s.title)); updateChrome(); }
     } else { updateChrome(); }
@@ -1023,6 +1296,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
        <div class="grp"><div class="lbl">${t('字体')}</div><div class="seg" id="s-font"><button data-f="system" class="${settings.font === 'system' ? 'active' : ''}">${t('系统')}</button><button data-f="sans" class="${settings.font === 'sans' ? 'active' : ''}">${t('黑体')}</button><button data-f="serif" class="${settings.font === 'serif' ? 'active' : ''}">${t('宋体')}</button></div></div>
        <label class="grp toggle"><span class="lbl">${t('显示目录侧栏（电脑端）')}</span><input type="checkbox" id="s-outline" ${settings.showOutline ? 'checked' : ''}></label>
        <label class="grp toggle"><span class="lbl">${t('右侧缩略图 Minimap（电脑端）')}</span><input type="checkbox" id="s-minimap" ${settings.minimap ? 'checked' : ''}></label>
+       <label class="grp toggle"><span class="lbl">${t('网文连续滚动')}</span><button type="button" class="qmark" data-q="${esc(t('像起点那样：滚到底自动接上下一章、向上滚动接上一章；章节会提前在后台取好、远处章节自动卸载。关掉则一章一页、用上一章 / 下一章翻页。'))}">?</button><input type="checkbox" id="s-seamless" ${settings.seamlessScroll ? 'checked' : ''}></label>
        <label class="grp toggle"><span class="lbl">${t('进入详情页自动沉浸')}</span><input type="checkbox" id="s-auto" ${settings.autoOpen ? 'checked' : ''}></label>
        <label class="grp toggle"><span class="lbl">${t('阅读进度')}</span><button type="button" class="qmark" data-q="${esc(t('网文回到上次看的章节，单篇回到上次的位置'))}">?</button><input type="checkbox" id="s-resume" ${settings.resume ? 'checked' : ''}></label>
        <div class="grp" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="set-btn" id="s-progexp" style="flex:1">⤓ ${t('导出进度')}</button><button class="set-btn" id="s-progimp" style="flex:1">⤒ ${t('导入进度')}</button><button type="button" class="qmark" data-q="${esc(t('进度只存在本机、按登录账号分开存放；换设备时导出再导入即可（不会与其它账号混用）。'))}">?</button><input type="file" id="s-progfile" accept="application/json,.json" style="display:none"></div>
@@ -1074,6 +1348,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     body.querySelector('#s-progfile').onchange = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => importProg(String(rd.result || '')); rd.readAsText(f); e.target.value = ''; };
     body.querySelector('#s-outline').onchange = (e) => { settings.showOutline = e.target.checked; saveSettings(); openOutline(e.target.checked && !isMobile()); };
     body.querySelector('#s-minimap').onchange = (e) => { settings.minimap = e.target.checked; saveSettings(); buildMinimap(); };
+    body.querySelector('#s-seamless').onchange = (e) => { settings.seamlessScroll = e.target.checked; saveSettings(); if (S.mode === 'series') { const i = S.idx; if (e.target.checked) renderFlow(i); else { flowTeardown(); renderChapter(i); } } };
     body.querySelector('#s-guide').onclick = () => { togglePanel(false); openGuide(0); };
     // Advanced/experimental disclosure (accessible button + region; remembers its open state so a
     // re-render — e.g. picking an LLM provider — doesn't fold it back up).
@@ -1276,8 +1551,24 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   function scheduleSaveProg() {
     clearTimeout(progTimer);
     progTimer = setTimeout(() => {
+      if (S.flow) {
+        const c = S.toc[S.idx];
+        if (c && c.aid && chapEl(S.idx)) saveProg(c.aid, chapFrac());
+        return;   // seamless: a coarse within-chapter offset, keyed on the ACTIVE chapter's aid
+      }
       const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0) saveProg(curBmAid(), sc.scrollTop / max);
     }, 700);
+  }
+  // seamless resume: restore the saved within-chapter offset for the chapter we opened at, re-pinning as
+  // lazy chunks/images settle (pinScroll re-targets; the chunk ResizeObserver pins everything above)
+  function restoreFlowProg(i) {
+    if (!settings.resume || !S.flow) return;
+    const c = S.toc[i]; if (!c || !c.aid) return;
+    const pct = getProg(c.aid); if (pct <= 0.03) return;
+    requestAnimationFrame(() => {
+      if (!S.flow || S.idx !== i || !chapEl(i)) return;
+      pinScroll(() => { const sec = chapEl(i); return sec ? chapTop(i) + pct * (sec.offsetHeight || 0) : 0; });
+    });
   }
   // scan a few pages of LK history (recency-sorted) and return the most-recently-read aid in this series
   async function lastReadAid(aidSet) {
@@ -1406,7 +1697,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   function openReader(aid) { pageAid = currentAid(); applyTheme(); $('overlay').classList.add('open'); document.documentElement.style.overflow = 'hidden'; openOutline(settings.showOutline && !isMobile()); openArticle(aid); maybeAutoGuide(); }
   function closeReader() {
     const landing = S.aid;
-    try { const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0 && S.aid) saveProg(curBmAid(), sc.scrollTop / max); } catch { /* */ }
+    try { if (S.flow) { const c = S.toc[S.idx]; if (c && c.aid) saveProg(c.aid, chapFrac()); } else { const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0 && S.aid) saveProg(curBmAid(), sc.scrollTop / max); } } catch { /* */ }
     $('overlay').classList.remove('open', 'splitting', 'marking', 'mm-on'); $('minimap').style.display = 'none'; document.documentElement.style.overflow = ''; exitMode(); togglePanel(false); openOutline(false); if ($('guide').classList.contains('show')) closeGuide();
     // if we were launched from a detail page and the reader walked to a different book/volume,
     // navigate the underlying site to it now (on exit) so the page behind matches what was read.
@@ -1418,13 +1709,16 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     }
   }
   function togglePanel(show) { hideQPop(); $('setPanel').classList.toggle('show', show); $('overlay').classList.toggle('panel-open', show); $('t-set').textContent = show ? '✕' : '⚙'; $('t-set').title = show ? t('关闭设置') : t('阅读设置'); updateScrim(); }
-  function updateTopBtn() { const el = $('scroll'); const atTop = el.scrollTop <= 60; const ic = $('r-top').querySelector('.ic'); const lb = $('r-top').querySelector('.lb'); if (atTop && savedScroll != null) { ic.textContent = '↓'; lb.textContent = t('返回'); } else { ic.textContent = '↑'; lb.textContent = t('顶部'); } }
-  function toggleTop() { const el = $('scroll'); const behavior = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth'; if (el.scrollTop > 60) { savedScroll = el.scrollTop; el.scrollTo({ top: 0, behavior }); } else if (savedScroll != null) { el.scrollTo({ top: savedScroll, behavior }); savedScroll = null; } setTimeout(updateTopBtn, 50); }
+  // In seamless flow, "顶部" means the top of the CURRENT chapter — scrolling to absolute 0 would land
+  // in the unloaded-spacer void above the window (and walk a prepend chain all the way to chapter 1).
+  function flowTopTarget() { return Math.max(0, (chapEl(S.idx) ? chapTop(S.idx) : 0) - 4); }
+  function updateTopBtn() { const el = $('scroll'); const atTop = el.scrollTop <= (S.flow ? flowTopTarget() + 60 : 60); const ic = $('r-top').querySelector('.ic'); const lb = $('r-top').querySelector('.lb'); if (atTop && savedScroll != null) { ic.textContent = '↓'; lb.textContent = t('返回'); } else { ic.textContent = '↑'; lb.textContent = t('顶部'); } }
+  function toggleTop() { const el = $('scroll'); const behavior = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth'; const top = S.flow ? flowTopTarget() : 0; if (el.scrollTop > top + 60) { savedScroll = el.scrollTop; el.scrollTo({ top, behavior }); } else if (savedScroll != null) { el.scrollTo({ top: savedScroll, behavior }); savedScroll = null; } setTimeout(updateTopBtn, 50); }
 
   /* ===================== minimap (Sublime-style: offscreen full map drawn once, visible slice blitted on scroll) ======================= */
   // Enriched: real image thumbnails + faint per-chapter bands + chapter divider lines + amber bookmark ticks.
   // For tall books the map SCROLLS (offset) and the viewport box stays grabbable; drag follows the cursor (grab offset).
-  let mmDrag = false, mmGrab = 0, mmRAF = 0, mmTimer = 0, mmMode = '', mmOff = 0, mmScaleSnap = 1;
+  let mmDrag = false, mmGrab = 0, mmRAF = 0, mmTimer = 0, mmMode = '', mmOff = 0, mmScaleSnap = 1, mmBaseSnap = 0;
   const minimapOn = () => settings.minimap && (S.mode === 'stream' || S.mode === 'series') && !isMobile() && $('overlay').classList.contains('open');
   const cssVar = (n, fb) => { try { return getComputedStyle($('overlay')).getPropertyValue(n).trim() || fb; } catch { return fb; } };
   const rgba = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return 'rgba(120,120,120,' + a + ')'; const n = parseInt(m[1], 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
@@ -1440,6 +1734,11 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   }
   function buildMinimap() {
     const mm = $('minimap'), ov = $('overlay'), content = $('content');
+    if (S.flow) {   // seamless web-novel → the windowed painter (loaded chapters + ↑/↓ caps)
+      if (!minimapOn() || !content || !content.querySelector('#flow') || !chapEl(S.win.first)) { mm.style.display = 'none'; ov.classList.remove('mm-on'); mm._full = null; return; }
+      mm.style.display = ''; ov.classList.add('mm-on');
+      buildMinimapFlow(); return;
+    }
     const body = content && content.querySelector('.body');
     if (!minimapOn() || !body) { mm.style.display = 'none'; ov.classList.remove('mm-on'); mm._full = null; return; }
     mm.style.display = ''; ov.classList.add('mm-on');
@@ -1494,9 +1793,81 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       fx.fillStyle = 'rgba(232,163,61,0.42)'; fx.fillRect(0, y, W, Math.max(3, h));
       fx.fillStyle = '#e8a33d'; fx.fillRect(W - 12, y - 1, 12, Math.max(11, h + 2)); fx.fillRect(0, y - 1, 4, Math.max(11, h + 2));
     });
-    mm._full = full;
+    mm._full = full; mm._flow = false;
     // late-loading images → rebuild so their thumbnails appear
     body.querySelectorAll('img').forEach((img) => { if (!img.complete) img.addEventListener('load', () => scheduleMinimap(180), { once: true }); });
+    syncMinimap();
+  }
+  // Flow minimap: a detailed map of the LOADED WINDOW (not the whole book — the spacers would crush 12
+  // real chapters into invisible slivers). Pinned ↑ / ↓ caps (drawn in syncMinimap) say how many chapters
+  // lie beyond the window; clicking a cap jumps to the adjacent unloaded chapter. The painter works from
+  // chunk-wrapper geometry + text-length metadata only, so it NEVER forces layout of a skipped chunk.
+  function buildMinimapFlow() {
+    const mm = $('minimap'), sc = $('scroll'), content = $('content');
+    const sbw = Math.max(0, sc.offsetWidth - sc.clientWidth); mm.style.right = sbw + 'px';
+    const W = Math.round(mm.clientWidth), H = Math.round(mm.clientHeight);
+    const firstSec = chapEl(S.win.first), lastSec = chapEl(S.win.last);
+    if (!W || !H || !firstSec || !lastSec) return;
+    const cw = content.offsetWidth || settings.width;
+    const winTop = secTop(firstSec), winBot = secTop(lastSec) + lastSec.offsetHeight, winH = Math.max(1, winBot - winTop);
+    let scale = W / cw, mapH = winH * scale;
+    const MAXH = 24000; if (mapH > MAXH) { scale *= MAXH / mapH; mapH = MAXH; }
+    mapH = Math.max(1, Math.round(mapH));
+    mm._scale = scale; mm._mapH = mapH; mm._flow = true; mm._base = winTop; mm._winH = winH;
+    const full = document.createElement('canvas'); full.width = W; full.height = mapH;
+    const fx = full.getContext('2d');
+    const scTop = sc.getBoundingClientRect().top, scScroll = sc.scrollTop;
+    const yOf = (el) => (el.getBoundingClientRect().top - scTop + scScroll - winTop) * scale;
+    const txtCol = cssVar('--ir-text', '#333'), mutedCol = cssVar('--ir-muted', '#888');
+    const cpl = flowCpl(), xPad = W * 0.12, lineW = W * 0.76;
+    fx.textBaseline = 'middle'; fx.textAlign = 'center'; fx.font = '700 9px system-ui,-apple-system,sans-serif';
+    let lastLbl = -999;
+    for (let i = S.win.first; i <= S.win.last; i++) {
+      const sec = chapEl(i); if (!sec) continue;
+      const top = yOf(sec), secH = sec.offsetHeight * scale;
+      if (i % 2) { fx.fillStyle = rgba(txtCol, 0.04); fx.fillRect(0, top, W, Math.max(1, secH)); }
+      const blocks = chapBlocks(i);
+      // text → striped mini lines per chunk (uniform rows from estimated line counts; image blocks → muted box)
+      fx.fillStyle = rgba(txtCol, 0.34);
+      sec.querySelectorAll('.chunk').forEach((ck) => {
+        const ckTop = yOf(ck), ckH = ck.offsetHeight * scale;
+        const s = Number(ck.dataset.ck) || 0, e = Math.min(blocks.length, s + CHUNK_BLOCKS);
+        let total = 0; const ln = [];
+        for (let bi = s; bi < e; bi++) { const l = blkLines(blocks[bi], cpl); ln.push(l); total += l; }
+        if (!total || ckH <= 0) return;
+        const rowH = ckH / total, lineH = Math.max(0.7, rowH * 0.55);
+        let cum = 0;
+        for (let k = 0; k < ln.length; k++) {
+          const blk = blocks[s + k], n = ln[k];
+          if (!blk.text) {
+            if (/<img\b/i.test(blk.html)) { fx.fillStyle = rgba(mutedCol, 0.45); const iw = W * 0.7; fx.fillRect((W - iw) / 2, ckTop + cum * rowH, iw, Math.max(2, n * rowH * 0.9)); fx.fillStyle = rgba(txtCol, 0.34); }
+            cum += n; continue;
+          }
+          for (let li = 0; li < n; li++) { let frac = 1; if (li === n - 1) frac = Math.max(0.16, Math.min(1, (blk.text.length - li * cpl) / cpl)); fx.fillRect(xPad, ckTop + (cum + li) * rowH, lineW * frac, lineH); }
+          cum += n;
+        }
+      });
+      // chapter divider + NAME tab
+      if (i > S.win.first) { fx.fillStyle = '#6366f1'; fx.fillRect(0, Math.round(top) - 1, W, 2.6); }
+      if (top - lastLbl >= 16) {
+        lastLbl = top;
+        const txt = chapTab(sec.dataset.label || ('#' + (i + 1)));
+        if (txt) { const tw = Math.min(W * 0.66, Math.ceil(fx.measureText(txt).width) + 8); fx.fillStyle = '#4f46e5'; fx.fillRect(0, top, tw, 14); fx.fillStyle = '#fff'; fx.fillText(txt, tw / 2, top + 7.5); }
+      }
+      // bookmarks → amber band + bold edge tabs (positions estimated from the same line metadata)
+      chapBm(i).forEach((b) => {
+        const cs = Math.floor(b.bi / CHUNK_BLOCKS) * CHUNK_BLOCKS;
+        const ck = sec.querySelector('.chunk[data-ck="' + cs + '"]'); if (!ck) return;
+        const ckTop = yOf(ck), ckH = ck.offsetHeight * scale, e = Math.min(blocks.length, cs + CHUNK_BLOCKS);
+        let total = 0, before = 0, cur = 1;
+        for (let bi = cs; bi < e; bi++) { const l = blkLines(blocks[bi], cpl); if (bi < b.bi) before += l; if (bi === b.bi) cur = l; total += l; }
+        if (!total) return;
+        const y = ckTop + (before / total) * ckH, h = Math.max(7, (cur / total) * ckH);
+        fx.fillStyle = 'rgba(232,163,61,0.42)'; fx.fillRect(0, y, W, Math.max(3, h));
+        fx.fillStyle = '#e8a33d'; fx.fillRect(W - 12, y - 1, 12, Math.max(11, h + 2)); fx.fillRect(0, y - 1, 4, Math.max(11, h + 2));
+      });
+    }
+    mm._full = full;
     syncMinimap();
   }
   function syncMinimap() {
@@ -1509,10 +1880,21 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
     const viewHmap = Math.max(14, vh * scale);
     const maxIndTop = Math.max(0, (mapH > H ? H : mapH) - viewHmap);
-    const prog = (docH - vh) > 0 ? st / (docH - vh) : 0;
+    // flow maps the loaded WINDOW (base.._winH), not the whole doc — the spacers are not on the canvas
+    const prog = mm._flow
+      ? Math.max(0, Math.min(1, (st - mm._base) / Math.max(1, mm._winH - vh)))
+      : ((docH - vh) > 0 ? st / (docH - vh) : 0);
     const indTop = prog * maxIndTop;
-    const offset = mapH > H ? Math.max(0, Math.min(mapH - H, st * scale - indTop)) : 0;
+    const yMap = mm._flow ? (st - mm._base) * scale : st * scale;
+    const offset = mapH > H ? Math.max(0, Math.min(mapH - H, yMap - indTop)) : 0;
     ctx.drawImage(mm._full, 0, offset, W, Math.min(H, mapH - offset), 0, 0, W, Math.min(H, mapH - offset));
+    // pinned ↑ / ↓ caps: how many chapters lie beyond the loaded window (click = jump to the next one)
+    if (mm._flow) {
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.font = '700 9px system-ui,-apple-system,sans-serif';
+      const en = curLang() === 'en', above = S.win.first, below = S.toc.length - 1 - S.win.last;
+      if (above > 0) { ctx.fillStyle = 'rgba(79,70,229,0.92)'; ctx.fillRect(0, 0, W, 16); ctx.fillStyle = '#fff'; ctx.fillText('↑ ' + above + (en ? '' : ' 章'), W / 2, 8); }
+      if (below > 0) { ctx.fillStyle = 'rgba(79,70,229,0.92)'; ctx.fillRect(0, H - 16, W, 16); ctx.fillStyle = '#fff'; ctx.fillText('↓ ' + below + (en ? '' : ' 章'), W / 2, H - 8); }
+    }
     view.style.top = indTop + 'px'; view.style.height = viewHmap + 'px';
     mm._indTop = indTop; mm._maxIndTop = maxIndTop; mm._viewHmap = viewHmap; mm._offset = offset;
   }
@@ -1521,6 +1903,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     const maxIndTop = mm._maxIndTop || 0;
     const indTop = Math.max(0, Math.min(maxIndTop, (clientY - rect.top) - mmGrab));
     const prog = maxIndTop > 0 ? indTop / maxIndTop : 0;
+    if (mm._flow) { sc.scrollTop = mm._base + prog * Math.max(0, mm._winH - sc.clientHeight); return; }   // scrub within the loaded window; crossing an edge slides it
     sc.scrollTop = prog * Math.max(0, sc.scrollHeight - sc.clientHeight); // instant (no smooth) so it tracks the cursor
   }
   // jump so the content drawn at the clicked minimap pixel lands centered in the viewport. The map is
@@ -1531,7 +1914,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   // follow-up pointermove would make a plain click double-jump to the wrong spot.
   function minimapGoTo(clientY) {
     const sc = $('scroll'), rect = $('minimap').getBoundingClientRect(), vh = sc.clientHeight;
-    const contentY = (mmOff + (clientY - rect.top)) / (mmScaleSnap || 1);
+    const contentY = mmBaseSnap + (mmOff + (clientY - rect.top)) / (mmScaleSnap || 1);   // flow: canvas Y is window-relative, so add the window base
     sc.scrollTop = Math.max(0, Math.min(Math.max(0, sc.scrollHeight - vh), contentY - vh / 2));
   }
   const scheduleMinimap = (d) => { clearTimeout(mmTimer); mmTimer = setTimeout(buildMinimap, d == null ? 250 : d); };
@@ -1610,11 +1993,16 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   // pointer capture → the drag follows the cursor reliably even over the host site's own handlers
   $('minimap').addEventListener('pointerdown', (e) => {
     const mm = $('minimap'), y = e.clientY - mm.getBoundingClientRect().top;
+    // flow: the pinned ↑ / ↓ caps jump to the chapter just beyond the loaded window
+    if (S.flow && mm._flow) {
+      if (S.win.first > 0 && y <= 16) { flowGoto(S.win.first - 1); e.preventDefault(); return; }
+      if (S.win.last < S.toc.length - 1 && y >= mm.clientHeight - 16) { flowGoto(S.win.last + 1); e.preventDefault(); return; }
+    }
     const indTop = mm._indTop || 0, viewH = mm._viewHmap || 0;
     if (y >= indTop && y <= indTop + viewH) {          // grabbed the viewport box → scrub (cursor stays on the box)
       mmMode = 'scrub'; mmGrab = y - indTop; minimapDragTo(e.clientY);
     } else {                                            // clicked elsewhere (e.g. a thumbnail) → jump to THAT content
-      mmMode = 'goto'; mmOff = mm._offset || 0; mmScaleSnap = mm._scale || 1; minimapGoTo(e.clientY);
+      mmMode = 'goto'; mmOff = mm._offset || 0; mmScaleSnap = mm._scale || 1; mmBaseSnap = mm._flow ? (mm._base || 0) : 0; minimapGoTo(e.clientY);
     }
     mmDrag = true; try { mm.setPointerCapture(e.pointerId); } catch { /* */ } e.preventDefault();
   });
@@ -1630,7 +2018,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     $('progress').style.width = (max > 0 ? Math.min(100, (top / max) * 100) : 0) + '%';
     lastScroll = top; updateTopBtn();
     if (minimapOn() && !mmRAF) mmRAF = requestAnimationFrame(() => { mmRAF = 0; syncMinimap(); });
-    if (S.mode === 'stream' && Date.now() - curTick > 120) { curTick = Date.now(); updateCurrent(); }
+    if (S.flow) flowOnScroll();
+    if ((S.mode === 'stream' || S.flow) && Date.now() - curTick > 120) { curTick = Date.now(); updateCurrent(S.flow ? true : undefined); }
     scheduleSaveProg();
   }, { passive: true });
 

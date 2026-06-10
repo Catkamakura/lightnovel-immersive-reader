@@ -2,7 +2,8 @@
 
 A single-file Tampermonkey userscript that injects a clean, Google-Docs-style **immersive reader** onto the live site `www.lightnovel.fun` *without replacing it*. Everything lives in one IIFE; the UI is mounted in a Shadow DOM so the host page's CSS can never touch it. This document maps the code so a human or an LLM agent can read, operate, and extend it.
 
-> File: `lightnovel-immersive-reader.user.js` · `@version 1.21.0` · vanilla JS, no dependencies.
+> File: `lightnovel-immersive-reader.user.js` · `@version 1.22.0` · vanilla JS, no dependencies.
+> Line numbers below are approximate — anchor on function names.
 
 ---
 
@@ -73,7 +74,9 @@ function resetState(aid) {
 | `author` | Uploader nickname (`detail.author.nickname`) — **note: uploader, not the real author** |
 | `bookTitle` | Cleaned title (`cleanTitle`) |
 | `busy` | True while an export/send is running (blocks dialog close) |
-| `mode` | **`'stream'`** (one long article chapterized, continuous scroll) or **`'series'`** (web novel, paged per chapter) |
+| `mode` | **`'stream'`** (one long article chapterized, continuous scroll) or **`'series'`** (web novel — seamless flow by default, paged when `seamlessScroll` is off) |
+| `flow` | `true` while the seamless web-novel flow is active (`renderFlow`); paged series and stream leave it `false` |
+| `win` | Seamless flow: the contiguous loaded-chapter window `{first, last}` (indices into `toc`) |
 | `mode2` | Interactive sub-mode for stream/series: `'read'` \| `'split'` \| `'bookmark'` |
 | `blocks` | `splitBlocks(raw)` output — `[{html, text}]`, the per-paragraph units (stream) |
 | `bclean` | Lazy cache of cleaned per-block HTML (`blkHtml`) for `blocks` |
@@ -164,7 +167,7 @@ Key normalization helpers: `norm` (line 87, folds full-width digits/letters and 
 ### Stream sections vs series chapters
 
 - **Stream** (`mode: 'stream'`): one article, `bounds` cut it into `sections`. `buildSections()` (lines 553–568) turns `bounds` into `[{title, start, end, head}]`, prepends a `卷首` section if content precedes the first boundary, and builds `cat`/`catLabels` (preferring the full detected `catalog` when not manually split).
-- **Series** (`mode: 'series'`): a web novel; `S.toc` is the list of chapter aids, each rendered on its own page via `renderChapter` → `renderSeriesBody` (a `.foot` with prev/目录/next). The decision happens in `openArticle` (see §9).
+- **Series** (`mode: 'series'`): a web novel; `S.toc` is the list of chapter aids. By default it renders as the **seamless flow** (`renderFlow`, §5a): a window of stacked chapter sections that auto-extends at both scroll edges. With `settings.seamlessScroll` off, each chapter renders on its own page via `renderChapter` → `renderSeriesBody` (a `.foot` with prev/目录/next). The decision happens in `openArticle` (see §9).
 
 ---
 
@@ -182,6 +185,16 @@ Blocks are rendered as inline **`.blk` spans** (one per paragraph) carrying `dat
 
 `.blk` interactivity is driven by CSS classes on `.body`: `interactive`, `splitting`, `marking` (see CSS lines 422–425), set from `mode2`. Bookmarked blocks get the `bm` class + an inline `🔖` `.bm-mark`.
 
+### 5a. Seamless web-novel flow (`renderFlow` and the `flow*` family)
+
+The default series renderer: a `#flow` container holding `#flowTop` spacer → a window of `<section class="ch chap" data-ci>` chapter sections → `#flowLoad` hint → `#flowBot` spacer. Scrolling near the window's bottom/top edge appends/prepends the adjacent chapter; distant chapters unload back into the spacers (`WIN_KEEP`, soft cap). Designed around why the v1.19 flow was too slow:
+
+- **Prefetch** (`flowPrefetch`): chapters `last+1`, `last+2`, `first-1` are fetched in the background while reading (single-flight via `ensureHtml`'s in-flight promise), so an edge hit is normally a memory-only DOM append. The `#flowLoad` hint only shows when the reader outruns the prefetch.
+- **Lazy chunk rendering** (`chapInnerHtml`): each chapter body is split into `.chunk` divs of `CHUNK_BLOCKS` blocks with `content-visibility: auto` and an inline `contain-intrinsic-size` estimated from text length (`flowCpl`/`blkLines`) — offscreen chapter text costs no layout/paint until it nears the viewport.
+- **Scroll-stability accounting**: the top spacer only ever changes inside `flowPrepend`/`flowUnload` by amounts that are simultaneously compensated in `scrollTop`; a `ResizeObserver` over every `.chunk` (`onFlowResize`) re-pins the viewport when content above it changes height (first-render estimate corrections, late images). Native scroll anchoring is disabled in flow (`.scroll.flow { overflow-anchor: none; }`) so the two mechanisms never double-correct.
+- **Edge triggers are window-relative** (`flowOnScroll`): ~1.5 viewports of runway is kept in both directions; a leap clear outside the window (native-scrollbar drag into spacer territory) rebuilds the window around the estimated landing chapter once the scroll settles. `flowTrim` only unloads sections at least a pad beyond the viewport so books of tiny chapters can't ping-pong.
+- **Active chapter** (`flowActiveFromScroll` → `flowSetActive`): drives the outline highlight, the `curChip` readout (`<chapter> · 第 i / N 章 · ~B%` via `chapFrac`), rail button states, debounced `addHistory` + URL `replaceState`. Bookmarks are per chapter via `data-ci` (`toggleBookmarkFlow` updates the one `.blk` surgically). `flowGoto` jumps within the window via `pinScroll` or rebuilds for a far jump. `r-top` means "top of the current chapter" in flow (`flowTopTarget`).
+
 ---
 
 ## 6. Navigation
@@ -192,7 +205,7 @@ Blocks are rendered as inline **`.blk` spans** (one per paragraph) carrying `dat
 | `scrollToSec(i)` | 677 | Jump to `#ch-i` (stream) via `pinScroll`. |
 | `secTop(el)` | 549 | Element top relative to the `scroll` container. |
 | `streamCur()` | 667 | Which section is currently at the top (top + 90px probe). |
-| `goPrev()` / `goNext()` | 678–679 | Series: `renderChapter(idx±1)`. Stream: move between sections (goPrev re-targets the current section's top first, so one press snaps to the heading before stepping back). |
+| `goPrev()` / `goNext()` | 678–679 | Seamless flow: `flowGoto(idx±1)` (jump to the chapter top). Paged series: `renderChapter(idx±1)`. Stream: move between sections (goPrev re-targets the current section's top first, so one press snaps to the heading before stepping back). |
 | `toggleTop()` / `updateTopBtn()` | back-to-top | Remembers `savedScroll` and flips the button to "返回". |
 
 Keyboard: `←`/`→` map to `goPrev`/`goNext`; `Esc` unwinds the deepest open layer (guide → split → bookmark → dialog → settings → mobile outline → close). See the `keydown` handler at lines 1385–1390.
@@ -210,6 +223,10 @@ Opt-in (`settings.minimap`), desktop + stream/series only (`minimapOn()`). It dr
 | `minimapDragTo(clientY)` | 1269–1275 | "Scrub" mode — drag the viewport box; instant (no smooth) so it tracks the cursor. |
 | `minimapGoTo(clientY)` | 1282–1286 | **Click-to-content**: jump so the content drawn at the clicked minimap pixel lands centered, using the slice offset/scale **snapshotted at pointer-down**. |
 | `scheduleMinimap(d)` | 1287 | Debounced rebuild. |
+
+### Flow mode: a windowed map with ↑ / ↓ caps
+
+In the seamless web-novel flow the minimap maps the **loaded window only** (`buildMinimapFlow`) — mapping the whole book would crush the real chapters into invisible slivers next to the giant spacers (the *native scrollbar* keeps serving as the approximate whole-book position). The painter works from chunk-wrapper geometry plus text-length estimates (never per-`.blk` rects, which would force every skipped `content-visibility` chunk to lay out): striped text lines, muted boxes for image blocks, indigo chapter dividers + name tabs, amber bookmark ticks. `syncMinimap` draws **pinned ↑ / ↓ caps** at the minimap edges showing how many chapters lie beyond the window; clicking a cap jumps to the adjacent unloaded chapter (`flowGoto`). Scrub/click mapping adds the window's content offset (`mm._base`, snapshotted at pointer-down as `mmBaseSnap`).
 
 ### The frozen-snapshot trick (click-to-content)
 
@@ -232,7 +249,7 @@ Per-block bookmarks stored in `localStorage` under `BM_KEY(aid)` = `'lkir_bm_' +
 
 Verified premise (commented near line 1086): **LK stores no within-article position anywhere.** So:
 
-- **Web novels** resume at the last-read **chapter** from LK's own history — `lastReadAid` matches by aid (handled inside `openArticle`).
+- **Web novels** resume at the last-read **chapter** from LK's own history — `lastReadAid` matches by aid (handled inside `openArticle`). In the seamless flow the **within-chapter offset** is additionally saved per chapter aid (`chapFrac` in `scheduleSaveProg`) and restored by `restoreFlowProg`.
 - **Single-article books** resume from a **local per-aid scroll fraction**.
 
 Progress is account-scoped under `LS_PROG = 'lir_progress'`, shape `{ <uid>: { <aid>: {p, t} } }`:
@@ -276,6 +293,7 @@ Inline help is **click-to-show**, not a native `title=` tooltip: a small `.qmark
 | `#s-font` | `font` | 系统 / 黑体 / 宋体 |
 | `#s-outline` | `showOutline` | desktop outline sidebar |
 | `#s-minimap` | `minimap` | right minimap |
+| `#s-seamless` | `seamlessScroll` | web novels: seamless continuous scroll (default) vs. paged; flipping it re-renders the open book in place |
 | `#s-auto` | `autoOpen` | auto-immerse on `/detail` |
 | `#s-resume` | `resume` | continue reading |
 | `#s-progexp` / `#s-progimp` / `#s-progfile` | — | export / import progress |
@@ -343,7 +361,10 @@ The site is a SPA, so route changes are intercepted:
 | `chapterize` | 117–172 | TOC-driven (fallback heading) chapter detection |
 | `splitBlocks` / `buildSections` | 116 / 553–568 | Paragraph units / stream sections + outline catalogue |
 | `renderStream` | 569–596 | Render chapterized single article |
-| `renderChapter` / `renderSeriesBody` | 635–645 / 646–664 | Render a web-novel chapter (paged) |
+| `renderChapter` / `renderSeriesBody` | 635–645 / 646–664 | Render a web-novel chapter (paged fallback) |
+| `renderFlow` / `flowAppend` / `flowPrepend` / `flowOnScroll` | §5a | Seamless web-novel flow (windowed, prefetched, chunk-lazy) |
+| `flowGoto` / `flowSetActive` / `chapFrac` | §5a | Flow navigation, active-chapter tracking, within-chapter fraction |
+| `buildMinimapFlow` | §7 | Flow minimap painter (loaded window + ↑/↓ caps) |
 | `pinScroll` | 671–676 | Instant, image-aware re-pinning jump |
 | `scrollToSec` / `goPrev` / `goNext` | 677 / 678 / 679 | Section / chapter navigation |
 | `buildMinimap` / `syncMinimap` / `minimapGoTo` | 1195–1251 / 1252–1268 / 1282–1286 | Minimap draw / blit / click-to-content (frozen snapshot) |
@@ -381,7 +402,10 @@ SPLIT_KEY(aid) = 'lkir_split_' + aid;   BM_KEY(aid) = 'lkir_bm_' + aid;
 DL_MIN_LEN = 3000;   // single-article download appears above this length
 VOL_LEN = 25000;     // article this long ⇒ "volume/book", not a chapter
 MANY_CHAPTERS = 20;  // series this large ⇒ web-novel chapters
+WIN_KEEP = 12;       // seamless flow: soft cap on chapters kept in the DOM
+CHUNK_BLOCKS = 30;   // seamless flow: blocks per content-visibility chunk
 // settings.epubVer: 3 (default, EPUB3) | 2 (EPUB2 fallback)
+// settings.seamlessScroll: true (default, seamless flow) | false (paged series)
 ```
 
 `@connect` grants in the header allow the bridge (`127.0.0.1`, `localhost`) and LLM hosts (`api.deepseek.com`, `api.kimi.com`, `api.openai.com`, `api.moonshot.cn`) plus the site itself. **Both the bridge integration and these cross-origin LLM connections are experimental** and used at the user's own risk.

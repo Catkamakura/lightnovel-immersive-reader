@@ -2,16 +2,16 @@
 
 > Orientation for an AI coding agent (and for Claude Code / Cursor). **Start here.**
 
-`lightnovel-immersive-reader` is a two-part personal-reading tool for **www.lightnovel.fun**. Part 1 is a single-file Tampermonkey **userscript** (`lightnovel-immersive-reader.user.js`, ~1550 lines of vanilla JS in one IIFE) that injects a clean, Google-Docs-style **immersive reader** into the *live* site without replacing it — it renders into a Shadow-DOM overlay under host `lkir-host` and reads the site's own JSON web API same-origin (`POST /proxy/api/...`). It supports continuous-scroll single articles and paged web-novel series, auto/manual chapterization, per-chapter bookmarks, a minimap, themes, account-scoped resume, and one-click **EPUB/TXT export** or **send-to-Calibre**. Part 2 is `calibre-bridge/`, an **optional** FastAPI companion the reader POSTs an EPUB to; it enriches the EPUB's OPF metadata and drops the file into a Calibre-Web-Automated (CWA) ingest folder (import-only — **no** progress/bookmark sync, no kosync).
+`lightnovel-immersive-reader` is a two-part personal-reading tool for **www.lightnovel.fun**. Part 1 is a single-file Tampermonkey **userscript** (`lightnovel-immersive-reader.user.js`, ~1900 lines of vanilla JS in one IIFE) that injects a clean, Google-Docs-style **immersive reader** into the *live* site without replacing it — it renders into a Shadow-DOM overlay under host `lkir-host` and reads the site's own JSON web API same-origin (`POST /proxy/api/...`). It supports continuous-scroll single articles and **seamless continuous-scroll web novels** (a windowed chapter flow with background prefetch and lazy `content-visibility` chunk rendering; a settings toggle falls back to the paged one-chapter-per-page reader), auto/manual chapterization, per-chapter bookmarks, a minimap, themes, account-scoped resume, and one-click **EPUB/TXT export** or **send-to-Calibre**. Part 2 is `calibre-bridge/`, an **optional** FastAPI companion the reader POSTs an EPUB to; it enriches the EPUB's OPF metadata and drops the file into a Calibre-Web-Automated (CWA) ingest folder (import-only — **no** progress/bookmark sync, no kosync).
 
 ## Project map
 
 | Path | What it is |
 |---|---|
-| `lightnovel-immersive-reader.user.js` | The whole reader. One IIFE: config/themes → API envelope → helpers (`stripTags`/`esc`/`norm`) → `chapterize`/`buildEpub` → render (stream/series, outline, minimap) → metadata (`extractCredits`/`extractMetaLLM`/`buildLibMeta`) → resume/progress → boot (`lkir-host` shadow root, SPA route watcher). |
-| `package.json` | npm metadata + `verify*` scripts. The userscript header `@version` (currently **1.21.0**) is the source of truth for the reader's version. |
+| `lightnovel-immersive-reader.user.js` | The whole reader. One IIFE: config/themes → API envelope → helpers (`stripTags`/`esc`/`norm`) → `chapterize`/`buildEpub` → render (stream / paged series / seamless flow `renderFlow`, outline, minimap) → metadata (`extractCredits`/`extractMetaLLM`/`buildLibMeta`) → resume/progress → boot (`lkir-host` shadow root, SPA route watcher). |
+| `package.json` | npm metadata + `verify*` scripts. The userscript header `@version` (currently **1.22.0**) is the source of truth for the reader's version. |
 | `verify/verify-userscript.mjs` | Playwright smoke test: injects the script (with a `GM_xmlhttpRequest` shim) into the live site, opens the reader, asserts UI. |
-| `verify/verify-webnovel.mjs` | Playwright checks for the paged web-novel (`series`) mode. |
+| `verify/verify-webnovel.mjs` | Playwright checks for the web-novel (`series`) mode: seamless flow (append/prepend/leap/bookmarks/minimap) + the paged fallback toggle. |
 | `verify/verify-lib.mjs` | Playwright checks for the send-to-library flow. |
 | `calibre-bridge/` | Optional FastAPI companion (uv + Docker). |
 | `calibre-bridge/bridge/main.py` | FastAPI app + endpoints (`/api/health`, `/api/import`, `/api/lookup`, `/api/books`), custom CORS/PNA middleware, bearer-token auth. |
@@ -59,7 +59,7 @@ uv run uvicorn bridge.main:app --port 8788
 
 | Task | Go to |
 |---|---|
-| Add/adjust a **reader feature** | The relevant render function in the userscript: `openArticle` (loads an aid, decides `stream` vs `series`), `renderStream` / `renderSeriesBody`, `openOutline` (left outline), minimap (`scheduleMinimap`). The launch button + SPA route watcher live near the bottom (`$('launch').onclick`, `onRoute`, `currentAid`). |
+| Add/adjust a **reader feature** | The relevant render function in the userscript: `openArticle` (loads an aid, decides `stream` vs `series`), `renderStream` / `renderSeriesBody` (paged) / `renderFlow` + `flowAppend`/`flowPrepend` (seamless web-novel flow), `openOutline` (left outline), minimap (`scheduleMinimap`, flow variant `buildMinimapFlow`). The launch button + SPA route watcher live near the bottom (`$('launch').onclick`, `onRoute`, `currentAid`). |
 | Change **chapter splitting** | `chapterize(html)` (≈L117) and `splitBlocks` — handles in-text 目录 TOC markers and heading detection. Manual splits persist per-aid via `loadSplit`/`saveSplit`. |
 | Change **EPUB output** | `buildEpub(bookTitle, author, srcUrl, chapters, coverUrl, onP, meta)` (≈L207) — embeds images via `gmBytes`, builds cover + OPF. |
 | Change **rule-based metadata** | `extractCredits(raw)` (≈L905) — the BBCode-stripped 作者/插画/翻译/图源/录入 parser (simplified+traditional). `buildLibMeta(llm)` (≈L977) assembles the final meta object sent to the bridge. Mirror any OPF-shape change in `epub_meta.py`. |
@@ -74,7 +74,7 @@ uv run uvicorn bridge.main:app --port 8788
 - **Bump `@version`** in the userscript header on every behavioral change (it drives Tampermonkey auto-update). The header version — not `package.json` — is authoritative.
 - **HTML escaping:** always wrap interpolated text with `esc()` (≈L92) when building markup; use `stripTags`/`htmlToText` to go the other way.
 - **API envelope:** all site calls go through `apiCall(path, d)` (≈L62) → `POST /proxy<path>` with the JSON envelope `{is_encrypted:0, platform:'pc', client:'web', sign:'', gz:0, d:{browser_id, session_id, security_key?, ...params}}`, `credentials:'include'`, and a `code !== 0` → throw contract. Don't hand-roll fetches to `/proxy`.
-- **Domain model:** an *article* (`aid`) = one chapter/post; a *series* (`sid`) groups articles. Two reader modes: `stream` (one long article, continuous scroll) and `series` (paged web novel).
+- **Domain model:** an *article* (`aid`) = one chapter/post; a *series* (`sid`) groups articles. Two reader modes: `stream` (one long article, continuous scroll) and `series` (web novel). Series renders as the **seamless flow** by default (`settings.seamlessScroll`, `S.flow === true`) or the paged one-chapter-per-page reader when toggled off.
 - **Progress is account-scoped** by `uid` parsed from the site's `security_key` (`<hex>:<uid>:<exp>`), keyed under `LS_PROG`. Export/import is per-account. Never let one account's slice bleed into another's.
 - **EPUB3 by default, EPUB2 fallback** (`settings.epubVer`). `buildEpub` and the bridge's `enrich_opf_bytes` are **version-aware**: EPUB3 writes `<meta refines property="role">` + `belongs-to-collection` + `dcterms:modified` (and cleans dangling `refines` on re-enrich); EPUB2 writes `opf:role` + `calibre:series`. `_split_names` splits multi-person credits into separate contributors. **EPUB3 output must stay epubcheck-clean** (validate via the Docker one-liner in `docs/development.md`).
 - **Persistence is `localStorage` only** in the reader (`lkir_settings`, `lkir_ids`, `lir_meta_cache`, `lir_progress`, bookmark/split keys). The bridge's only state is its SQLite registry.
@@ -88,6 +88,8 @@ uv run uvicorn bridge.main:app --port 8788
 - **Bridge reachability ≠ CORS.** Because `GM_xmlhttpRequest` runs in the extension context, it bypasses CORS/PNA/mixed-content, so the bridge can live anywhere reachable by IP/host. The CORS/PNA middleware in `main.py` exists only for page-context fetches (the Vue web app, the test shim) — don't assume the userscript needs it.
 - **Two LLM wire protocols.** `style:'openai'` → `POST {base}/chat/completions` (Bearer auth); `style:'anthropic'` (Kimi Code at `api.kimi.com/coding`) → `POST {base}/v1/messages` (`x-api-key` + `anthropic-version`). `extractMetaLLM` branches on `style`; handle both when touching it.
 - **`enrich_epub` is best-effort.** If OPF surgery throws, `main.py` falls back to importing the *original* bytes and reports `enrich_error` — don't let an enrichment change hard-fail an import.
+- **Seamless flow scroll math is owned by the flow code.** The top spacer (`#flowTop`) may only change inside `flowPrepend`/`flowUnload`, which compensate `scrollTop` by the exact same amount; a chunk `ResizeObserver` re-pins the viewport when content above it changes height, and native `overflow-anchor` is disabled (`.scroll.flow`) so the two never double-correct. Don't resize the spacers or set `scrollTop` from new code paths without going through that accounting.
+- **Never force layout of skipped `.chunk`s.** Flow chapter bodies render in `content-visibility: auto` chunks; reading per-block geometry (`getBoundingClientRect` on `.blk`s) across the window forces every skipped chunk to lay out and defeats the optimization — that's why `buildMinimapFlow` paints from chunk-wrapper geometry + text-length estimates instead.
 - **Empty `docs/`** — don't link readers there expecting content.
 
 ## Hard rules
