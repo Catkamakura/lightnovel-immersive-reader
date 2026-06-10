@@ -51,6 +51,9 @@ check('scrolling down auto-loads later chapters (prefetch keeps pace); window st
 await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const items = [...r.getElementById('outlineList').querySelectorAll('.cat-item')]; items[items.length - 1].click(); });
 await sleep(p, 2200);
 const beforeUp = await ciSet();
+// scroll DOWN a little first (edge loading is direction-gated), then UP to the window's top edge
+await ev(p, () => { const sc = document.getElementById('lkir-host').shadowRoot.getElementById('scroll'); sc.scrollTop = sc.scrollTop + 400; sc.dispatchEvent(new Event('scroll')); });
+await sleep(p, 300);
 await ev(p, () => { const r = document.getElementById('lkir-host').shadowRoot; const sc = r.getElementById('scroll'); const first = r.querySelector('#flow .chap[data-ci]'); const top = first.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; sc.scrollTop = top + 60; sc.dispatchEvent(new Event('scroll')); });
 await sleep(p, 1400);
 const afterUp = await ciSet();

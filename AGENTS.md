@@ -9,7 +9,7 @@
 | Path | What it is |
 |---|---|
 | `lightnovel-immersive-reader.user.js` | The whole reader. One IIFE: config/themes → API envelope → helpers (`stripTags`/`esc`/`norm`) → `chapterize`/`buildEpub` → render (stream / paged series / seamless flow `renderFlow`, outline, minimap) → metadata (`extractCredits`/`extractMetaLLM`/`buildLibMeta`) → resume/progress → boot (`lkir-host` shadow root, SPA route watcher). |
-| `package.json` | npm metadata + `verify*` scripts. The userscript header `@version` (currently **1.22.0**) is the source of truth for the reader's version. |
+| `package.json` | npm metadata + `verify*` scripts. The userscript header `@version` (currently **2.0.0**) is the source of truth for the reader's version. |
 | `verify/verify-userscript.mjs` | Playwright smoke test: injects the script (with a `GM_xmlhttpRequest` shim) into the live site, opens the reader, asserts UI. |
 | `verify/verify-webnovel.mjs` | Playwright checks for the web-novel (`series`) mode: seamless flow (append/prepend/leap/bookmarks/minimap) + the paged fallback toggle. |
 | `verify/verify-lib.mjs` | Playwright checks for the send-to-library flow. |

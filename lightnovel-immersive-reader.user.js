@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         轻读 · LightNovel 沉浸阅读 (Immersive Reader)
 // @namespace    https://lightnovel.fun/immersive-reader
-// @version      1.22.0
+// @version      2.0.0
 // @description  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
 // @description:zh-CN  为 lightnovel.fun 提供干净的沉浸式阅读器（分章 / 书签 / 缩略图 / 主题 / 续读 / 导出 EPUB·TXT）。
 // @description:en  A clean immersive reader for lightnovel.fun (chapterize, bookmarks, minimap, themes, resume, EPUB/TXT export).
@@ -417,10 +417,13 @@
 .content { max-width: var(--ir-width); margin: 0 auto; padding: 64px 24px 96px; font-size: var(--ir-fs); line-height: var(--ir-lh); }
 .content h1.t { font-size: 1.5em; font-weight: 800; text-align: center; margin: 0 0 12px; } .content .meta { text-align: center; color: var(--ir-muted); font-size: .72em; margin-bottom: 36px; }
 .body p { margin: 0 0 .9em; } .body img { max-width: 100% !important; height: auto !important; display: block; margin: 1.3em auto; border-radius: 8px; } .body a { color: #6366f1; word-break: break-all; } .body hr { border: none; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 35%, transparent); margin: 1.4em 0; } .body table { max-width: 100%; }
-/* seamless web-novel flow: stacked chapter sections with a clear divider; spacers stand in for unloaded chapters */
-.chap { border-top: 1px solid color-mix(in srgb, var(--ir-muted) 18%, transparent); }
-.chap:first-of-type { border-top: none; }
-.chap h1.t { font-size: 1.42em; font-weight: 800; text-align: center; margin: 1.5em 0 10px; line-height: 1.4; }
+/* seamless web-novel flow: a WIDE, unmistakable gap between chapters (hairline + centered ornament).
+   The divider is part of the chapter BELOW it and only the book's true first chapter (data-ci="0")
+   goes without one — position-independent, so prepending can't change a neighbour's height and
+   shift the page. Spacers stand in for unloaded chapters. */
+.chap { margin-top: 30px; }
+.chap:not([data-ci="0"])::before { content: '❖'; display: block; text-align: center; color: color-mix(in srgb, var(--ir-muted) 75%, transparent); font-size: .85em; line-height: 1; padding-top: 52px; margin: 0 0 52px; border-top: 1px solid color-mix(in srgb, var(--ir-muted) 26%, transparent); }
+.chap h1.t { font-size: 1.42em; font-weight: 800; text-align: center; margin: 0 0 10px; line-height: 1.4; }
 .chap .meta { text-align: center; color: var(--ir-muted); font-size: .72em; margin-bottom: 30px; }
 .chap-spacer { width: 100%; }
 /* lazy chunk rendering: offscreen chunks skip layout/paint entirely; contain-intrinsic-size (inline,
@@ -826,7 +829,8 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
           to it, and a ResizeObserver on every .chunk re-pins the viewport when content ABOVE it changes
           height (first-render corrections, late images) — no scroll jumps, no double-correction
           (native overflow-anchor is off in flow). ----- */
-  let flowRO = null, flowGen = 0, flowVoidT = 0, flowAppendBusy = false, flowPrependBusy = false;
+  let flowRO = null, flowGen = 0, flowVoidT = 0, flowPreT = 0, flowAppendBusy = false, flowPrependBusy = false;
+  let flowDir = 1, flowLastTop = 0;   // last user scroll direction (+down/−up); programmatic moves resync flowLastTop
   const flowChunkH = new WeakMap();   // chunk el -> last seen height (-1 = baseline pending)
   function chapBlocks(i) { const c = S.toc[i]; if (!c.blocks) { c.blocks = splitBlocks(c.html || ''); c.bclean = []; } return c.blocks; }
   function chapBm(i) { const c = S.toc[i]; if (!c.bm) c.bm = loadBM(c.aid); return c.bm; }
@@ -872,19 +876,27 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       if (prev == null || prev < 0 || h === prev) continue;
       if (secTop(ck) + Math.min(prev, h) <= sc.scrollTop + 1) shift += h - prev;
     }
-    if (shift) sc.scrollTop = Math.max(0, sc.scrollTop + shift);
+    if (shift) { sc.scrollTop = Math.max(0, sc.scrollTop + shift); flowLastTop = sc.scrollTop; }
   }
   const topSpacerH = () => { const el = $('flowTop'); return el ? (parseFloat(el.style.height) || 0) : 0; };
   const setTopSpacer = (px) => { const el = $('flowTop'); if (el) el.style.height = Math.max(0, Math.round(px)) + 'px'; };
   function setBotSpacer() { const el = $('flowBot'); if (!el) return; let h = 0; for (let j = S.win.last + 1; j < S.toc.length; j++) h += estH(j); el.style.height = Math.round(h) + 'px'; }
   function flowLoadHint(on) { const el = $('content') && $('content').querySelector('#flowLoad'); if (el) el.style.display = on ? '' : 'none'; }
-  // fire-and-forget: warm the next two chapters (and one behind) so edge hits never wait on the network
+  // fire-and-forget: warm the NEXT chapter right away; the one after it and the one behind follow on a
+  // short delay so a window move costs one request up front, not a three-request burst
   function flowPrefetch() {
     if (!S.flow) return;
-    [S.win.last + 1, S.win.last + 2, S.win.first - 1].forEach((j) => { if (j >= 0 && j < S.toc.length && S.toc[j].html == null) ensureHtml(j); });
+    const nxt = S.win.last + 1;
+    if (nxt < S.toc.length && S.toc[nxt].html == null) ensureHtml(nxt);
+    const gen = flowGen;
+    clearTimeout(flowPreT);
+    flowPreT = setTimeout(() => {
+      if (!S.flow || gen !== flowGen) return;
+      [S.win.last + 2, S.win.first - 1].forEach((j) => { if (j >= 0 && j < S.toc.length && S.toc[j].html == null) ensureHtml(j); });
+    }, 900);
   }
   function flowTeardown() {
-    flowGen++; flowAppendBusy = flowPrependBusy = false; clearTimeout(flowVoidT);
+    flowGen++; flowAppendBusy = flowPrependBusy = false; clearTimeout(flowVoidT); clearTimeout(flowPreT);
     if (flowRO) { flowRO.disconnect(); flowRO = null; }
     const sc = $('scroll'); if (sc) sc.classList.remove('flow');
     S.flow = false;
@@ -902,7 +914,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     flowRO = new ResizeObserver(onFlowResize);
     const wrap = document.createElement('div'); wrap.id = 'flow';
     const top = document.createElement('div'); top.className = 'chap-spacer'; top.id = 'flowTop';
-    const load = document.createElement('div'); load.className = 'flow-load'; load.id = 'flowLoad'; load.style.display = 'none'; load.textContent = t('加载中…');
+    const load = document.createElement('div'); load.className = 'flow-load'; load.id = 'flowLoad'; load.style.display = 'none'; load.textContent = t('加载中…'); load.setAttribute('role', 'status');
     const bot = document.createElement('div'); bot.className = 'chap-spacer'; bot.id = 'flowBot';
     wrap.appendChild(top); wrap.appendChild(chapSection(start)); wrap.appendChild(load); wrap.appendChild(bot);
     $('content').innerHTML = ''; $('content').appendChild(wrap);
@@ -912,6 +924,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     let th = 0; for (let j = 0; j < start; j++) th += estH(j);
     setTopSpacer(th); setBotSpacer(); flowTail();
     $('scroll').scrollTop = start <= 0 ? 0 : Math.max(0, chapTop(start) - 4); $('progress').style.width = '0';
+    flowDir = 1; flowLastTop = $('scroll').scrollTop;   // assume forward reading until the user scrolls up
     addHistory(S.toc[start].aid); if (pageAid != null) { try { history.replaceState(history.state, '', '/detail/' + S.toc[start].aid); } catch { /* */ } }
     $('overlay').classList.toggle('marking', S.mode2 === 'bookmark'); $('overlay').classList.remove('splitting');
     updateChrome(); buildMinimap(); scheduleMinimap(700);
@@ -942,6 +955,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       $('flowTop').after(chapSection(i)); S.win.first = i; measure(i);
       setTopSpacer(T - used);
       sc.scrollTop = Math.max(0, sc.scrollTop + (S.toc[i].h || 0) - used);   // keep the viewport pinned to what it was showing
+      flowLastTop = sc.scrollTop;   // programmatic move — don't let it flip the perceived scroll direction
       flowTrim('bot');
       flowTail(); flowReresolveActive(); flowPrefetch(); scheduleMinimap(300);
     } finally { flowPrependBusy = false; }
@@ -991,6 +1005,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
     if (!firstSec || !lastSec) return;
     const winTop = secTop(firstSec), winBot = secTop(lastSec) + lastSec.offsetHeight;
     const vTop = sc.scrollTop, vBot = vTop + sc.clientHeight, pad = Math.max(1200, sc.clientHeight * 1.5);
+    const dy = vTop - flowLastTop; if (dy) flowDir = dy; flowLastTop = vTop;
     const slack = sc.clientHeight / 2;   // a momentum flick may overshoot the edge a little — that's not a leap
     // leapt clear outside the loaded window (native-scrollbar drag into spacer territory)?
     // once the scroll settles, rebuild the window around the estimated landing chapter.
@@ -1006,11 +1021,14 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
         if (mid < wt) { let acc = wt; target = 0; for (let j = S.win.first - 1; j >= 0; j--) { acc -= estH(j); if (mid >= acc) { target = j; break; } } }
         else { let acc = wb; target = S.toc.length - 1; for (let j = S.win.last + 1; j < S.toc.length; j++) { acc += estH(j); if (mid <= acc) { target = j; break; } } }
         renderFlow(target);
-      }, 160);
+      }, 240);
       return;
     }
-    if (vTop < winTop + pad) flowPrepend();
-    if (vBot > winBot - pad) flowAppend();
+    // direction-gated: only extend in the direction the reader is moving (or once clearly past an
+    // edge), so opening a mid-book chapter doesn't eagerly fetch both neighbours at once. The 8px
+    // tolerance covers renderFlow's "chapTop - 4" parking spot — that's not really past the edge.
+    if (vTop < winTop + pad && (flowDir < 0 || vTop < winTop - 8)) flowPrepend();
+    if (vBot > winBot - pad && (flowDir > 0 || vBot > winBot + 8)) flowAppend();
     const act = flowActiveFromScroll();
     if (act !== S.idx) flowSetActive(act);
   }
@@ -1696,7 +1714,9 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
   /* ===================== open/close + events ================= */
   function openReader(aid) { pageAid = currentAid(); applyTheme(); $('overlay').classList.add('open'); document.documentElement.style.overflow = 'hidden'; openOutline(settings.showOutline && !isMobile()); openArticle(aid); maybeAutoGuide(); }
   function closeReader() {
-    const landing = S.aid;
+    // land the site on the chapter actually being READ (in a web novel that's the active chapter,
+    // which the live URL sync already shows — not the aid the book was first opened at)
+    const landing = (S.mode === 'series' && S.toc[S.idx]) ? S.toc[S.idx].aid : S.aid;
     try { if (S.flow) { const c = S.toc[S.idx]; if (c && c.aid) saveProg(c.aid, chapFrac()); } else { const sc = $('scroll'), max = sc.scrollHeight - sc.clientHeight; if (max > 0 && S.aid) saveProg(curBmAid(), sc.scrollTop / max); } } catch { /* */ }
     $('overlay').classList.remove('open', 'splitting', 'marking', 'mm-on'); $('minimap').style.display = 'none'; document.documentElement.style.overflow = ''; exitMode(); togglePanel(false); openOutline(false); if ($('guide').classList.contains('show')) closeGuide();
     // if we were launched from a detail page and the reader walked to a different book/volume,
@@ -1707,6 +1727,7 @@ input[type=checkbox] { accent-color: #6366f1; width: 16px; height: 16px; cursor:
       pageAid = landing;
       setTimeout(() => { suppressOpen = false; }, 1800);
     }
+    if (S.flow) flowTeardown();   // stop observers/timers while the overlay is closed (reopen re-renders anyway)
   }
   function togglePanel(show) { hideQPop(); $('setPanel').classList.toggle('show', show); $('overlay').classList.toggle('panel-open', show); $('t-set').textContent = show ? '✕' : '⚙'; $('t-set').title = show ? t('关闭设置') : t('阅读设置'); updateScrim(); }
   // In seamless flow, "顶部" means the top of the CURRENT chapter — scrolling to absolute 0 would land

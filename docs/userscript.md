@@ -2,7 +2,7 @@
 
 A single-file Tampermonkey userscript that injects a clean, Google-Docs-style **immersive reader** onto the live site `www.lightnovel.fun` *without replacing it*. Everything lives in one IIFE; the UI is mounted in a Shadow DOM so the host page's CSS can never touch it. This document maps the code so a human or an LLM agent can read, operate, and extend it.
 
-> File: `lightnovel-immersive-reader.user.js` · `@version 1.22.0` · vanilla JS, no dependencies.
+> File: `lightnovel-immersive-reader.user.js` · `@version 2.0.0` · vanilla JS, no dependencies.
 > Line numbers below are approximate — anchor on function names.
 
 ---
@@ -192,7 +192,7 @@ The default series renderer: a `#flow` container holding `#flowTop` spacer → a
 - **Prefetch** (`flowPrefetch`): chapters `last+1`, `last+2`, `first-1` are fetched in the background while reading (single-flight via `ensureHtml`'s in-flight promise), so an edge hit is normally a memory-only DOM append. The `#flowLoad` hint only shows when the reader outruns the prefetch.
 - **Lazy chunk rendering** (`chapInnerHtml`): each chapter body is split into `.chunk` divs of `CHUNK_BLOCKS` blocks with `content-visibility: auto` and an inline `contain-intrinsic-size` estimated from text length (`flowCpl`/`blkLines`) — offscreen chapter text costs no layout/paint until it nears the viewport.
 - **Scroll-stability accounting**: the top spacer only ever changes inside `flowPrepend`/`flowUnload` by amounts that are simultaneously compensated in `scrollTop`; a `ResizeObserver` over every `.chunk` (`onFlowResize`) re-pins the viewport when content above it changes height (first-render estimate corrections, late images). Native scroll anchoring is disabled in flow (`.scroll.flow { overflow-anchor: none; }`) so the two mechanisms never double-correct.
-- **Edge triggers are window-relative** (`flowOnScroll`): ~1.5 viewports of runway is kept in both directions; a leap clear outside the window (native-scrollbar drag into spacer territory) rebuilds the window around the estimated landing chapter once the scroll settles. `flowTrim` only unloads sections at least a pad beyond the viewport so books of tiny chapters can't ping-pong.
+- **Edge triggers are window-relative and direction-gated** (`flowOnScroll`): ~1.5 viewports of runway is kept in the direction the reader is moving (`flowDir`; programmatic scroll moves resync `flowLastTop` so they can't flip it), so opening a mid-book chapter doesn't eagerly fetch both neighbours; prefetch staggers the second-ahead and one-behind requests by ~900ms. A leap clear outside the window (native-scrollbar drag into spacer territory) rebuilds the window around the estimated landing chapter once the scroll settles. `flowTrim` only unloads sections at least a pad beyond the viewport so books of tiny chapters can't ping-pong.
 - **Active chapter** (`flowActiveFromScroll` → `flowSetActive`): drives the outline highlight, the `curChip` readout (`<chapter> · 第 i / N 章 · ~B%` via `chapFrac`), rail button states, debounced `addHistory` + URL `replaceState`. Bookmarks are per chapter via `data-ci` (`toggleBookmarkFlow` updates the one `.blk` surgically). `flowGoto` jumps within the window via `pinScroll` or rebuilds for a far jump. `r-top` means "top of the current chapter" in flow (`flowTopTarget`).
 
 ---
