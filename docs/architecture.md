@@ -106,7 +106,11 @@ Thin wrappers over `apiCall`: `getDetail(aid)`, `getContent(aid)`, `getSeries(si
 - **article (`aid`)** = one chapter/post. **series (`sid`)** = a group of articles.
 - The reader has two **modes** (`S.mode`):
   - `'stream'` — one long article chapterized into editable sections, continuous scroll.
-  - `'series'` — a web novel, paged chapter-by-chapter (one `aid` per chapter).
+  - `'series'` — a web novel (one `aid` per chapter). Renders as the **seamless flow** by default
+    (`settings.seamlessScroll`, `S.flow === true`): a window of stacked chapter sections that
+    auto-extends at both scroll edges, with background prefetch and `content-visibility` chunk
+    rendering (see `docs/userscript.md` §5a). Toggling the setting off falls back to the classic
+    paged chapter-per-page renderer.
 - `S.mode2` is the interactive sub-mode for stream/series: `'read'` | `'split'` | `'bookmark'`.
 
 ### How a book is classified (`openArticle`)

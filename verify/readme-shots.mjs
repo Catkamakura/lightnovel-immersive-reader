@@ -47,33 +47,7 @@ await p.evaluate(() => {
 await p.waitForTimeout(1300)
 await p.screenshot({ path: 'docs/assets/readme-flow.png' })
 
-// 2) bookmarks: mark two paragraphs in the active chapter (书签 tab)
-await p.evaluate(() => { const rr = document.getElementById('lkir-host').shadowRoot; const t = [...rr.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.textContent.includes('书签')); t.click() })
-await p.waitForTimeout(600)
-await p.evaluate(() => {
-  const rr = document.getElementById('lkir-host').shadowRoot
-  const sc = rr.getElementById('scroll')
-  const probe = sc.scrollTop + 200
-  const secs = [...rr.querySelectorAll('#flow .chap[data-ci]')]
-  let sec = secs[0]
-  for (const s of secs) { const t = s.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; if (t <= probe) sec = s }
-  const blks = [...sec.querySelectorAll('.blk[data-bi]')].filter((b) => (b.textContent || '').trim().length > 12)
-  blks[1] && blks[1].click()
-  blks[3] && blks[3].click()
-})
-await p.waitForTimeout(900)
-await p.screenshot({ path: 'docs/assets/readme-bookmarks.png' })
-await p.evaluate(() => { const rr = document.getElementById('lkir-host').shadowRoot; const t = [...rr.getElementById('outlineTabs').querySelectorAll('button')].find((x) => x.dataset.t === 'toc'); t && t.click() })
-await p.waitForTimeout(400)
-
-// 3) settings panel
-await p.evaluate(() => document.getElementById('lkir-host').shadowRoot.getElementById('t-set').click())
-await p.waitForTimeout(700)
-await p.screenshot({ path: 'docs/assets/readme-settings.png' })
-await p.evaluate(() => document.getElementById('lkir-host').shadowRoot.getElementById('t-set').click())
-await p.waitForTimeout(400)
-
-// 4) download dialog with the chapter-range picker
+// 2) download dialog with the chapter-range picker
 await p.evaluate(() => document.getElementById('lkir-host').shadowRoot.getElementById('t-dlCorner').click())
 await p.waitForTimeout(700)
 await p.evaluate(() => { const rr = document.getElementById('lkir-host').shadowRoot; const items = rr.getElementById('dlList').querySelectorAll('.dl-ch'); items[2] && items[2].click(); items[9] && items[9].click() })

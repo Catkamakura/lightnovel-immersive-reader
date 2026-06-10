@@ -40,7 +40,7 @@ The harnesses use these live AIDs as fixtures; they are good manual test cases t
 | --- | --- | --- |
 | `1144661` | Stream, multi-volume (分卷) | Layout, outline, split mode, bookmarks, minimap, guide, volume switch + URL sync |
 | `1144697` | Big single article | Chapterized 目录, download, send-to-library |
-| `1144698` | Web novel (series, paged) | Per-chapter bookmarks, paged rendering, chapter-range download |
+| `1144698` | Web novel (series, 68 chapters) | Seamless flow (append/prepend/leap, chunks, divider), per-chapter bookmarks, paged fallback toggle, chapter-range download |
 
 ## Verify harnesses (`verify/`)
 
@@ -49,7 +49,7 @@ All three are Playwright scripts that read the userscript from disk, inject a **
 | Harness | npm script | What it checks | Requirements |
 | --- | --- | --- | --- |
 | `verify/verify-userscript.mjs` | `npm run verify` | **32 checks** across groups A (layout/interactions on a stream multi-volume book: outline, split, grouped bookmarks + delete-confirm, theme swatches, settings toggle), D (no-edit-hover, minimap build + drag, guide spotlight/steps/auto-open), B (分卷 switch + URL sync on exit), C (big single article) | `npx playwright install chromium` |
-| `verify/verify-webnovel.mjs` | `npm run verify:webnovel` | **7 checks** on a web-novel series: paged `.blk` rendering, per-chapter bookmarks (a different chapter shows only its own), minimap in series, numeric chapter-range download (two number inputs, default = ALL, named ends, clamps invalid input), and the guide **Skip** button responding to a *real mouse click* (regression guard for the `.guide-step` opacity stacking context) | same |
+| `verify/verify-webnovel.mjs` | `npm run verify:webnovel` | **12 checks** on a web-novel series: seamless flow rendering (stacked `.chap` sections of lazy `.chunk` wrappers), forward auto-append (prefetch keeps pace; window bounded), upward prepend at the window edge after a far jump, native-scrollbar leap → window rebuild, per-chapter bookmarks (a different chapter shows only its own), minimap in flow, the chip readout (`第 i / N 章 · ~%`), the seamless↔paged toggle round-trip, the list + number-input chapter-range picker, and the guide **Skip** button responding to a *real mouse click* (regression guard for the `.guide-step` opacity stacking context) | same |
 | `verify/verify-lib.mjs` | `npm run verify:lib` | End-to-end reader ↔ bridge: health (`mode=ingest`), 发送到书库 button, EPUB import with parsed metadata (title/translator/series/volume), success dialog, EPUB lands in the CWA ingest folder, book queryable via `/api/lookup` | **bridge running on `:8788`** + chromium |
 
 ### Running them
